@@ -29,6 +29,7 @@ async function signToken(user: AuthUser, type: TokenKind, expiresIn: number) {
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
+    .setJti(crypto.randomUUID())
     .setIssuedAt()
     .setExpirationTime(`${expiresIn}s`)
     .sign(getSecret(type));
