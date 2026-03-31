@@ -1,4 +1,7 @@
+import { existsSync } from "node:fs";
+import { copyFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { join } from "node:path";
 
 function run(command) {
   execSync(command, {
@@ -18,3 +21,19 @@ if (process.env.DIRECT_URL?.trim()) {
 }
 
 run("npx next build");
+
+const routesManifestPath = join(".next", "routes-manifest.json");
+const deterministicRoutesManifestPath = join(
+  ".next",
+  "routes-manifest-deterministic.json",
+);
+
+if (
+  existsSync(routesManifestPath) &&
+  !existsSync(deterministicRoutesManifestPath)
+) {
+  copyFileSync(routesManifestPath, deterministicRoutesManifestPath);
+  console.warn(
+    "[vercel-build] Added routes-manifest-deterministic.json as a compatibility fallback for Vercel packaging.",
+  );
+}
