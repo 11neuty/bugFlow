@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Manrope } from "next/font/google";
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 import { Providers } from "@/app/providers";
 import "./globals.css";
@@ -31,6 +32,7 @@ export default function RootLayout({
     >
       <body className="min-h-full font-sans text-foreground">
         <Providers>{children}</Providers>
+        <SpeedInsights />
       </body>
     </html>
   );
