@@ -17,6 +17,8 @@ import { parseApiResponse } from "@/api/client";
 import { createRequestId } from "@/lib/utils";
 import type { AuthPayload, AuthUser } from "@/lib/types";
 
+const SESSION_STORAGE_KEY = "bugflow.session";
+
 interface AuthContextValue {
   user: AuthUser | null;
   isReady: boolean;
@@ -31,6 +33,52 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function readStoredSession() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as {
+      accessToken: string;
+      user: AuthUser;
+    };
+
+    if (!parsed.accessToken || !parsed.user) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSession(payload: AuthPayload | null) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (!payload) {
+    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    return;
+  }
+
+  window.sessionStorage.setItem(
+    SESSION_STORAGE_KEY,
+    JSON.stringify({
+      accessToken: payload.accessToken,
+      user: payload.user,
+    }),
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -42,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const commitSession = useCallback((payload: AuthPayload | null) => {
     accessTokenRef.current = payload?.accessToken ?? null;
+    writeStoredSession(payload);
 
     startTransition(() => {
       setUser(payload?.user ?? null);
@@ -59,6 +108,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return payload.accessToken;
       })
       .catch(() => {
+        const storedSession = readStoredSession();
+
+        if (storedSession) {
+          accessTokenRef.current = storedSession.accessToken;
+          setUser(storedSession.user);
+          return storedSession.accessToken;
+        }
+
         commitSession(null);
         return null;
       })
@@ -73,6 +130,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [commitSession]);
 
   useEffect(() => {
+    const storedSession = readStoredSession();
+
+    if (storedSession) {
+      accessTokenRef.current = storedSession.accessToken;
+      setUser(storedSession.user);
+      setIsReady(true);
+      setIsAuthenticating(false);
+    }
+
     void refreshSession();
   }, [refreshSession]);
 

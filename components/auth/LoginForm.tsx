@@ -2,6 +2,8 @@
 
 import { ArrowRight, KeyRound } from "lucide-react";
 import { useState } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -28,10 +30,17 @@ const seedAccounts = [
 ];
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
-  const { login, isAuthenticating } = useAuth();
+  const router = useRouter();
+  const { login, isAuthenticating, isReady, user } = useAuth();
   const { pushToast } = useToast();
   const [email, setEmail] = useState("admin@bugtracker.dev");
   const [password, setPassword] = useState("Admin123!");
+
+  useEffect(() => {
+    if (isReady && user) {
+      router.replace(redirectTo);
+    }
+  }, [isReady, redirectTo, router, user]);
 
   return (
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_420px]">

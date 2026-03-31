@@ -18,10 +18,16 @@ export async function loginRequest(input: {
 }
 
 export async function refreshRequest() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   const response = await fetch("/api/v1/auth/refresh", {
     method: "POST",
     credentials: "include",
+    signal: controller.signal,
   });
+
+  clearTimeout(timeoutId);
 
   return parseApiResponse<AuthPayload>(response);
 }
