@@ -12,6 +12,14 @@ function applySecurityHeaders(response: NextResponse) {
   response.headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
 }
 
+function isAppRouterDataRequest(request: NextRequest) {
+  return (
+    request.headers.has("rsc") ||
+    request.headers.has("next-router-prefetch") ||
+    request.headers.get("accept")?.includes("text/x-component") === true
+  );
+}
+
 export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   const requestId = getRequestId(request);
@@ -57,18 +65,20 @@ export function proxy(request: NextRequest) {
     response.headers.set("x-ratelimit-remaining", String(result.remaining));
   }
 
-  if (
-    (pathname === "/dashboard" || pathname.startsWith("/issues/")) &&
-    !request.cookies.get(REFRESH_TOKEN_COOKIE)
-  ) {
-    const url = new URL("/login", request.url);
-    url.searchParams.set("redirectTo", pathname);
+  if (!isAppRouterDataRequest(request)) {
+    if (
+      (pathname === "/dashboard" || pathname.startsWith("/issues/")) &&
+      !request.cookies.get(REFRESH_TOKEN_COOKIE)
+    ) {
+      const url = new URL("/login", request.url);
+      url.searchParams.set("redirectTo", pathname);
 
-    return NextResponse.redirect(url);
-  }
+      return NextResponse.redirect(url);
+    }
 
-  if (pathname === "/login" && request.cookies.get(REFRESH_TOKEN_COOKIE)) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    if (pathname === "/login" && request.cookies.get(REFRESH_TOKEN_COOKIE)) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
   }
 
   applySecurityHeaders(response);
