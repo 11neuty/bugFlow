@@ -51,6 +51,7 @@ Required variables:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/bugflow?schema=public"
+DIRECT_URL="postgresql://postgres:postgres@localhost:5432/bugflow?schema=public"
 JWT_SECRET="replace-with-a-long-random-access-secret"
 REFRESH_SECRET="replace-with-a-long-random-refresh-secret"
 ```
@@ -63,7 +64,7 @@ REFRESH_SECRET="replace-with-a-long-random-refresh-secret"
 npm install
 ```
 
-2. Make sure PostgreSQL is running and `DATABASE_URL` points to it.
+2. Make sure PostgreSQL is running and both `DATABASE_URL` and `DIRECT_URL` point to it.
 
 3. Apply the Prisma migration:
 
@@ -107,6 +108,39 @@ The current codebase passes:
 npm run lint
 npm run build
 ```
+
+## Deploy To Vercel
+
+1. Push the repository to GitHub.
+
+2. In Vercel, import the repository and keep the detected framework as Next.js.
+
+3. In Project Settings -> Environment Variables, add:
+
+```env
+DATABASE_URL="your-neon-pooled-connection-string"
+DIRECT_URL="your-neon-direct-connection-string"
+JWT_SECRET="your-production-access-secret"
+REFRESH_SECRET="your-production-refresh-secret"
+```
+
+Use the Neon pooled connection for `DATABASE_URL` and the direct connection for `DIRECT_URL`. This lets the app use pooled connections at runtime while Prisma migrations run through a direct connection during the build.
+
+4. In Project Settings -> Build & Development Settings, set the Build Command to:
+
+```bash
+npm run vercel-build
+```
+
+5. Deploy the project.
+
+6. After the first production deploy succeeds, run the seed once against the production database so you can log in with the default accounts:
+
+```bash
+npm run db:seed
+```
+
+Do not add the seed command to the Vercel build step.
 
 ## Notes
 
