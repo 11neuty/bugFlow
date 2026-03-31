@@ -5,11 +5,16 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import type { IssueSummary, UserSummary } from "@/lib/types";
+import {
+  MAX_ISSUE_DESCRIPTION_LENGTH,
+  MAX_ISSUE_TITLE_LENGTH,
+} from "@/lib/constants";
+import type { IssueSummary, Role, UserSummary } from "@/lib/types";
 
 interface IssueModalProps {
   open: boolean;
   members: UserSummary[];
+  currentUserRole: Role;
   onClose: () => void;
   onSubmit: (input: {
     title: string;
@@ -31,11 +36,15 @@ const initialState = {
 export function IssueModal({
   open,
   members,
+  currentUserRole,
   onClose,
   onSubmit,
 }: IssueModalProps) {
   const [formState, setFormState] = useState(initialState);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const assignableMembers = members.filter(
+    (member) => currentUserRole === "DEVELOPER" || member.role !== "ADMIN",
+  );
 
   useEffect(() => {
     if (open) {
@@ -78,6 +87,7 @@ export function IssueModal({
         <div className="grid gap-5 md:grid-cols-2">
           <Input
             label="Title"
+            maxLength={MAX_ISSUE_TITLE_LENGTH}
             onChange={(event) =>
               setFormState((current) => ({
                 ...current,
@@ -101,12 +111,17 @@ export function IssueModal({
               value={formState.assigneeId}
             >
               <option value="">Unassigned</option>
-              {members.map((member) => (
+              {assignableMembers.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.name} ({member.role})
                 </option>
               ))}
             </select>
+            {currentUserRole !== "DEVELOPER" ? (
+              <span className="text-xs text-slate-500">
+                Admin users cannot be assigned by Admin or QA accounts.
+              </span>
+            ) : null}
           </label>
         </div>
 
@@ -114,6 +129,7 @@ export function IssueModal({
           <span className="text-sm font-medium text-slate-700">Description</span>
           <textarea
             className="min-h-36 rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-[color:var(--color-primary)] focus:ring-4 focus:ring-blue-100"
+            maxLength={MAX_ISSUE_DESCRIPTION_LENGTH}
             onChange={(event) =>
               setFormState((current) => ({
                 ...current,

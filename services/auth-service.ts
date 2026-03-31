@@ -97,6 +97,17 @@ export async function registerUser(input: {
   password: string;
   role: AuthUser["role"];
 }) {
+  return {
+    user: await createUserAccount(input),
+  };
+}
+
+export async function createUserAccount(input: {
+  name: string;
+  email: string;
+  password: string;
+  role: AuthUser["role"];
+}) {
   const existingUser = await prisma.user.findUnique({
     where: {
       email: input.email,
@@ -118,9 +129,7 @@ export async function registerUser(input: {
     },
   });
 
-  return {
-    user: toUserSummary(user),
-  };
+  return toUserSummary(user);
 }
 
 export async function loginUser(input: { email: string; password: string }) {

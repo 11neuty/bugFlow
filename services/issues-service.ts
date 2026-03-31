@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
-import { conflict, notFound } from "@/lib/errors";
+import { badRequest, conflict, notFound } from "@/lib/errors";
 import {
   assertCanAssignIssue,
   assertCanDeleteIssue,
@@ -26,10 +26,26 @@ import {
   userSummarySelect,
 } from "@/services/serializers";
 
-function buildIssueWhere(filters: IssueFilters): Prisma.IssueWhereInput {
+const INACTIVE_ISSUE_STATUSES: IssueSummary["status"][] = ["CLOSED", "REJECTED"];
+
+function buildIssueWhere(
+  filters: IssueFilters,
+  options: {
+    activeOnly?: boolean;
+    ignoreStatus?: boolean;
+  } = {},
+): Prisma.IssueWhereInput {
+  const status = options.activeOnly
+    ? {
+        notIn: INACTIVE_ISSUE_STATUSES,
+      }
+    : options.ignoreStatus
+      ? undefined
+      : filters.status;
+
   return {
     deletedAt: null,
-    status: filters.status,
+    status,
     priority: filters.priority,
     severity: filters.severity,
     assigneeId: filters.assigneeId,
@@ -54,13 +70,47 @@ function buildIssueWhere(filters: IssueFilters): Prisma.IssueWhereInput {
   };
 }
 
+async function resolveAssignee(user: AuthUser, assigneeId?: string | null) {
+  if (!assigneeId) {
+    return null;
+  }
+
+  const assignee = await prisma.user.findUnique({
+    where: {
+      id: assigneeId,
+    },
+    select: {
+      id: true,
+      name: true,
+      role: true,
+    },
+  });
+
+  if (!assignee) {
+    throw notFound("Assignee not found.");
+  }
+
+  if (
+    (user.role === "ADMIN" || user.role === "QA") &&
+    assignee.role === "ADMIN"
+  ) {
+    throw badRequest("Admins and QA cannot assign issues to admin users.");
+  }
+
+  return assignee;
+}
+
 export async function listIssues(filters: IssueFilters) {
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 12;
   const skip = (page - 1) * limit;
   const where = buildIssueWhere(filters);
+  const activeWhere = buildIssueWhere(filters, {
+    activeOnly: true,
+    ignoreStatus: true,
+  });
 
-  const [issues, total] = await prisma.$transaction([
+  const [issues, total, activeTotal] = await prisma.$transaction([
     prisma.issue.findMany({
       where,
       include: issueSummaryInclude,
@@ -71,11 +121,13 @@ export async function listIssues(filters: IssueFilters) {
       take: limit,
     }),
     prisma.issue.count({ where }),
+    prisma.issue.count({ where: activeWhere }),
   ]);
 
   return {
     issues: issues.map(serializeIssue),
     total,
+    activeTotal,
     page,
     limit,
     totalPages: Math.max(1, Math.ceil(total / limit)),
@@ -92,25 +144,16 @@ export async function createIssue(
     assigneeId?: string;
   },
 ) {
-  const issue = await prisma.$transaction(async (tx) => {
-    if (input.assigneeId) {
-      await tx.user.findUniqueOrThrow({
-        where: {
-          id: input.assigneeId,
-        },
-        select: {
-          id: true,
-        },
-      });
-    }
+  const assignee = await resolveAssignee(user, input.assigneeId);
 
+  const issue = await prisma.$transaction(async (tx) => {
     const createdIssue = await tx.issue.create({
       data: {
         title: input.title,
         description: input.description,
         priority: input.priority,
         severity: input.severity,
-        assigneeId: input.assigneeId ?? null,
+        assigneeId: assignee?.id ?? null,
         reporterId: user.id,
       },
       include: issueSummaryInclude,
@@ -123,6 +166,7 @@ export async function createIssue(
       metadata: {
         title: createdIssue.title,
         status: createdIssue.status,
+        assignee: assignee?.name ?? "Unassigned",
       },
     });
 
@@ -168,10 +212,12 @@ export async function getIssueDetail(id: string): Promise<IssueDetailPayload> {
     select: userSummarySelect,
   });
 
+  const userNameById = new Map(teamMembers.map((member) => [member.id, member.name]));
+
   return {
     issue: serializeIssue(issue),
     comments: issue.comments.map(serializeComment),
-    auditLogs: issue.auditLogs.map(serializeAuditLog),
+    auditLogs: issue.auditLogs.map((log) => serializeAuditLog(log, userNameById)),
     teamMembers: teamMembers.map(serializeUser),
   };
 }
@@ -208,18 +254,12 @@ export async function updateIssue(
     input.assigneeId !== existingIssue.assigneeId
   ) {
     assertCanAssignIssue(user, existingIssue);
-
-    if (input.assigneeId) {
-      await prisma.user.findUniqueOrThrow({
-        where: {
-          id: input.assigneeId,
-        },
-        select: {
-          id: true,
-        },
-      });
-    }
   }
+
+  const nextAssignee =
+    input.assigneeId !== undefined && input.assigneeId !== existingIssue.assigneeId
+      ? await resolveAssignee(user, input.assigneeId)
+      : undefined;
 
   if (input.status) {
     validateStatusTransition(user, existingIssue, input.status);
@@ -241,7 +281,7 @@ export async function updateIssue(
         ...(input.priority !== undefined ? { priority: input.priority } : {}),
         ...(input.severity !== undefined ? { severity: input.severity } : {}),
         ...(input.assigneeId !== undefined
-          ? { assigneeId: input.assigneeId }
+          ? { assigneeId: nextAssignee?.id ?? null }
           : {}),
         version: {
           increment: 1,
@@ -278,8 +318,8 @@ export async function updateIssue(
         userId: user.id,
         action: "ASSIGNMENT_CHANGED",
         metadata: {
-          from: existingIssue.assigneeId,
-          to: input.assigneeId,
+          from: existingIssue.assignee?.name ?? null,
+          to: nextIssue.assignee?.name ?? null,
         },
       });
     }
@@ -305,7 +345,7 @@ export async function deleteIssue(user: AuthUser, id: string) {
     throw notFound("Issue not found.");
   }
 
-  assertCanDeleteIssue(user, issue);
+  assertCanDeleteIssue(user);
 
   await prisma.$transaction(async (tx) => {
     await tx.issue.update({

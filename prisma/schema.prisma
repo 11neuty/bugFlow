@@ -17,7 +17,8 @@ enum Role {
 enum IssueStatus {
   TODO
   IN_PROGRESS
-  DONE
+  CLOSED
+  REJECTED
 }
 
 enum IssuePriority {

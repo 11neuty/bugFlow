@@ -10,6 +10,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH } from "@/lib/constants";
 
 const seedAccounts = [
   {
@@ -118,6 +119,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
           <Input
             autoComplete="email"
             label="Email"
+            maxLength={MAX_EMAIL_LENGTH}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@company.com"
             type="email"
@@ -127,6 +129,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
           <Input
             autoComplete="current-password"
             label="Password"
+            maxLength={MAX_PASSWORD_LENGTH}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Enter your password"
             type="password"

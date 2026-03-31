@@ -52,6 +52,29 @@ type SerializedAuditLog = Prisma.AuditLogGetPayload<{
   include: typeof auditLogWithUserInclude;
 }>;
 
+function normalizeAuditMetadata(
+  metadata: Prisma.JsonValue | null,
+  userNameById: ReadonlyMap<string, string>,
+) {
+  if (!metadata || Array.isArray(metadata) || typeof metadata !== "object") {
+    return null;
+  }
+
+  return Object.fromEntries(
+    Object.entries(metadata).map(([key, value]) => {
+      if ((key === "from" || key === "to") && value === null) {
+        return [key, "Unassigned"];
+      }
+
+      if (typeof value === "string") {
+        return [key, userNameById.get(value) ?? value];
+      }
+
+      return [key, value];
+    }),
+  );
+}
+
 export function serializeUser(user: SerializedUser): UserSummary {
   return {
     id: user.id,
@@ -87,11 +110,14 @@ export function serializeComment(comment: SerializedComment): CommentRecord {
   };
 }
 
-export function serializeAuditLog(log: SerializedAuditLog): AuditLogRecord {
+export function serializeAuditLog(
+  log: SerializedAuditLog,
+  userNameById: ReadonlyMap<string, string> = new Map(),
+): AuditLogRecord {
   return {
     id: log.id,
     action: log.action,
-    metadata: (log.metadata as Record<string, unknown> | null) ?? null,
+    metadata: normalizeAuditMetadata(log.metadata, userNameById),
     createdAt: log.createdAt.toISOString(),
     user: serializeUser(log.user),
   };

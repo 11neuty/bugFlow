@@ -2,18 +2,20 @@
 
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { UserPlus } from "lucide-react";
 
 import {
   createIssueRequest,
   fetchIssues,
-  fetchUsers,
   updateIssueRequest,
 } from "@/api/issues";
+import { createUserRequest, fetchUsers } from "@/api/users";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { IssueFilterBar } from "@/components/dashboard/IssueFilterBar";
 import { IssueModal } from "@/components/dashboard/IssueModal";
 import { KanbanBoard } from "@/components/dashboard/KanbanBoard";
+import { UserModal } from "@/components/dashboard/UserModal";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -39,8 +41,10 @@ export function DashboardView() {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [meta, setMeta] = useState({
     total: 0,
+    activeTotal: 0,
     page: 1,
     limit: 12,
     totalPages: 1,
@@ -81,6 +85,7 @@ export function DashboardView() {
         setMembers(userResult.users);
         setMeta({
           total: issueResult.total,
+          activeTotal: issueResult.activeTotal,
           page: issueResult.page,
           limit: issueResult.limit,
           totalPages: issueResult.totalPages,
@@ -111,13 +116,19 @@ export function DashboardView() {
     setIsRefreshing(true);
 
     try {
-      const result = await fetchIssues(authorizedFetch, filters);
-      setIssues(result.issues);
+      const [issueResult, userResult] = await Promise.all([
+        fetchIssues(authorizedFetch, filters),
+        fetchUsers(authorizedFetch),
+      ]);
+
+      setIssues(issueResult.issues);
+      setMembers(userResult.users);
       setMeta({
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        totalPages: result.totalPages,
+        total: issueResult.total,
+        activeTotal: issueResult.activeTotal,
+        page: issueResult.page,
+        limit: issueResult.limit,
+        totalPages: issueResult.totalPages,
       });
     } catch (refreshError) {
       pushToast({
@@ -136,9 +147,20 @@ export function DashboardView() {
   return (
     <AppShell
       actions={
-        <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500">
-          {meta.total} active issue{meta.total === 1 ? "" : "s"}
-        </div>
+        <>
+          <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500">
+            {meta.activeTotal} active issue{meta.activeTotal === 1 ? "" : "s"}
+          </div>
+          {user?.role === "ADMIN" ? (
+            <Button
+              leadingIcon={<UserPlus className="size-4" />}
+              onClick={() => setIsUserModalOpen(true)}
+              variant="secondary"
+            >
+              New user
+            </Button>
+          ) : null}
+        </>
       }
       subtitle="Track work across the board, capture fresh reports, and move issues through the workflow with optimistic updates."
       title="Dashboard"
@@ -194,6 +216,7 @@ export function DashboardView() {
                   item.id === issueId ? result.issue : item,
                 ),
               );
+              await refreshBoard();
 
               pushToast({
                 title: "Issue moved",
@@ -260,6 +283,7 @@ export function DashboardView() {
       </div>
 
       <IssueModal
+        currentUserRole={user?.role ?? "DEVELOPER"}
         members={members}
         onClose={() => setIsCreateOpen(false)}
         onSubmit={async (input) => {
@@ -274,6 +298,22 @@ export function DashboardView() {
           await refreshBoard();
         }}
         open={isCreateOpen}
+      />
+
+      <UserModal
+        onClose={() => setIsUserModalOpen(false)}
+        onSubmit={async (input) => {
+          const result = await createUserRequest(authorizedFetch, input);
+
+          pushToast({
+            title: "User created",
+            description: `${result.user.name} can sign in with the new account now.`,
+            tone: "success",
+          });
+
+          await refreshBoard();
+        }}
+        open={isUserModalOpen}
       />
     </AppShell>
   );

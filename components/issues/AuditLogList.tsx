@@ -16,6 +16,22 @@ function toneForAction(action: AuditLogRecord["action"]) {
   }
 }
 
+function labelForAction(action: AuditLogRecord["action"]) {
+  return action.toLowerCase().replaceAll("_", " ");
+}
+
+function formatMetadataKey(key: string) {
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function formatMetadataValue(value: unknown) {
+  if (typeof value === "string" && /^[A-Z_]+$/.test(value)) {
+    return value.toLowerCase().replaceAll("_", " ");
+  }
+
+  return String(value ?? "none");
+}
+
 export function AuditLogList({ logs }: { logs: AuditLogRecord[] }) {
   if (logs.length === 0) {
     return (
@@ -31,7 +47,7 @@ export function AuditLogList({ logs }: { logs: AuditLogRecord[] }) {
         <Card key={log.id} className="p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-3">
-              <Badge tone={toneForAction(log.action)}>{log.action}</Badge>
+              <Badge tone={toneForAction(log.action)}>{labelForAction(log.action)}</Badge>
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-slate-950">
                   {log.user.name}
@@ -42,8 +58,10 @@ export function AuditLogList({ logs }: { logs: AuditLogRecord[] }) {
                 <div className="rounded-[20px] bg-slate-50 p-3 text-sm text-slate-600">
                   {Object.entries(log.metadata).map(([key, value]) => (
                     <p key={key}>
-                      <span className="font-medium text-slate-900">{key}:</span>{" "}
-                      {String(value ?? "none")}
+                      <span className="font-medium text-slate-900">
+                        {formatMetadataKey(key)}:
+                      </span>{" "}
+                      {formatMetadataValue(value)}
                     </p>
                   ))}
                 </div>

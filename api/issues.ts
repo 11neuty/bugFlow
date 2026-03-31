@@ -4,7 +4,6 @@ import type {
   IssueFilters,
   IssueListPayload,
   IssueSummary,
-  UserSummary,
 } from "@/lib/types";
 
 export type AuthorizedFetcher = <T>(
@@ -143,8 +142,4 @@ export function createCommentRequest(
       body: JSON.stringify({ content }),
     },
   );
-}
-
-export function fetchUsers(authorizedFetch: AuthorizedFetcher) {
-  return authorizedFetch<{ users: UserSummary[] }>("/api/v1/users");
 }

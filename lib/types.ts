@@ -1,5 +1,5 @@
 export type Role = "ADMIN" | "QA" | "DEVELOPER";
-export type IssueStatus = "TODO" | "IN_PROGRESS" | "DONE";
+export type IssueStatus = "TODO" | "IN_PROGRESS" | "CLOSED" | "REJECTED";
 export type IssuePriority = "LOW" | "MEDIUM" | "HIGH";
 export type IssueSeverity = "LOW" | "MEDIUM" | "CRITICAL";
 export type AuditAction =
@@ -62,6 +62,7 @@ export interface AuthPayload {
 export interface IssueListPayload {
   issues: IssueSummary[];
   total: number;
+  activeTotal: number;
   page: number;
   limit: number;
   totalPages: number;

@@ -25,8 +25,10 @@ type CommentSortOrder = "desc" | "asc";
 
 function badgeToneForStatus(status: IssueSummary["status"]) {
   switch (status) {
-    case "DONE":
+    case "CLOSED":
       return "green";
+    case "REJECTED":
+      return "red";
     case "IN_PROGRESS":
       return "amber";
     default:
@@ -107,6 +109,15 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
           ? rightTimestamp - leftTimestamp
           : leftTimestamp - rightTimestamp;
       })
+    : [];
+  const restrictAdminAssignments = user?.role === "ADMIN" || user?.role === "QA";
+  const assignableTeamMembers = detail
+    ? detail.teamMembers.filter(
+        (member) =>
+          !restrictAdminAssignments ||
+          member.role !== "ADMIN" ||
+          member.id === detail.issue.assignee?.id,
+      )
     : [];
 
   return (
@@ -214,14 +225,18 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                     content,
                   );
 
-                  setDetail((currentDetail) =>
-                    currentDetail
-                      ? {
-                          ...currentDetail,
-                          comments: [...currentDetail.comments, result.comment],
-                        }
-                      : currentDetail,
-                  );
+                  try {
+                    await reloadIssue();
+                  } catch {
+                    setDetail((currentDetail) =>
+                      currentDetail
+                        ? {
+                            ...currentDetail,
+                            comments: [...currentDetail.comments, result.comment],
+                          }
+                        : currentDetail,
+                    );
+                  }
 
                   pushToast({
                     title: "Comment posted",
@@ -309,6 +324,7 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                               }
                             : currentDetail,
                         );
+                        await reloadIssue().catch(() => undefined);
 
                         pushToast({
                           title: "Assignment updated",
@@ -331,12 +347,17 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                     value={detail.issue.assignee?.id ?? ""}
                   >
                     <option value="">Unassigned</option>
-                    {detail.teamMembers.map((member) => (
+                    {assignableTeamMembers.map((member) => (
                       <option key={member.id} value={member.id}>
                         {member.name} ({member.role})
                       </option>
                     ))}
                   </select>
+                  {restrictAdminAssignments ? (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Admin users cannot be assigned by Admin or QA accounts.
+                    </p>
+                  ) : null}
                 </div>
 
                 <div>
@@ -379,6 +400,7 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                               }
                             : currentDetail,
                         );
+                        await reloadIssue().catch(() => undefined);
 
                         pushToast({
                           title: "Status updated",
@@ -402,37 +424,40 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                   >
                     <option value="TODO">Todo</option>
                     <option value="IN_PROGRESS">In progress</option>
-                    <option value="DONE">Done</option>
+                    <option value="CLOSED">Closed</option>
+                    <option value="REJECTED">Rejected</option>
                   </select>
                 </div>
 
-                <Button
-                  className="w-full"
-                  leadingIcon={<Trash2 className="size-4" />}
-                  variant="danger"
-                  onClick={async () => {
-                    try {
-                      await deleteIssueRequest(authorizedFetch, issueId);
-                      pushToast({
-                        title: "Issue deleted",
-                        description: "The issue has been removed from the board.",
-                        tone: "success",
-                      });
-                      window.location.assign("/dashboard");
-                    } catch (deleteError) {
-                      pushToast({
-                        title: "Delete failed",
-                        description:
-                          deleteError instanceof Error
-                            ? deleteError.message
-                            : "Unable to delete this issue.",
-                        tone: "error",
-                      });
-                    }
-                  }}
-                >
-                  Delete issue
-                </Button>
+                {user?.role === "ADMIN" ? (
+                  <Button
+                    className="w-full"
+                    leadingIcon={<Trash2 className="size-4" />}
+                    variant="danger"
+                    onClick={async () => {
+                      try {
+                        await deleteIssueRequest(authorizedFetch, issueId);
+                        pushToast({
+                          title: "Issue deleted",
+                          description: "The issue has been removed from the board.",
+                          tone: "success",
+                        });
+                        window.location.assign("/dashboard");
+                      } catch (deleteError) {
+                        pushToast({
+                          title: "Delete failed",
+                          description:
+                            deleteError instanceof Error
+                              ? deleteError.message
+                              : "Unable to delete this issue.",
+                          tone: "error",
+                        });
+                      }
+                    }}
+                  >
+                    Delete issue
+                  </Button>
+                ) : null}
               </div>
             </Card>
 

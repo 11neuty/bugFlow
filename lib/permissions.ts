@@ -15,8 +15,8 @@ export function canEditIssue(user: AuthUser, issue: IssueAccessRecord) {
   return issue.reporterId === user.id || issue.assigneeId === user.id;
 }
 
-export function canDeleteIssue(user: AuthUser, issue: IssueAccessRecord) {
-  return user.role === "ADMIN" || issue.reporterId === user.id;
+export function canDeleteIssue(user: AuthUser) {
+  return user.role === "ADMIN";
 }
 
 export function canAssignIssue(user: AuthUser, issue: IssueAccessRecord) {
@@ -29,8 +29,8 @@ export function assertCanEditIssue(user: AuthUser, issue: IssueAccessRecord) {
   }
 }
 
-export function assertCanDeleteIssue(user: AuthUser, issue: IssueAccessRecord) {
-  if (!canDeleteIssue(user, issue)) {
+export function assertCanDeleteIssue(user: AuthUser) {
+  if (!canDeleteIssue(user)) {
     throw forbidden("You do not have permission to delete this issue.");
   }
 }
@@ -50,11 +50,7 @@ export function validateStatusTransition(
     return;
   }
 
-  if (user.role === "ADMIN") {
-    return;
-  }
-
-  if (issue.status === "DONE" && nextStatus === "TODO" && user.role === "QA") {
+  if (user.role === "ADMIN" || user.role === "QA") {
     return;
   }
 
@@ -65,9 +61,10 @@ export function validateStatusTransition(
   }
 
   const allowedTransitions: Record<IssueStatus, IssueStatus[]> = {
-    TODO: ["IN_PROGRESS"],
-    IN_PROGRESS: ["TODO", "DONE"],
-    DONE: [],
+    TODO: ["IN_PROGRESS", "CLOSED", "REJECTED"],
+    IN_PROGRESS: ["TODO", "CLOSED", "REJECTED"],
+    CLOSED: ["TODO"],
+    REJECTED: ["TODO"],
   };
 
   if (!allowedTransitions[issue.status].includes(nextStatus)) {
