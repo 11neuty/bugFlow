@@ -26,7 +26,7 @@ export function IssueFilterBar({
   onCreateIssue,
 }: IssueFilterBarProps) {
   return (
-    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px_180px_180px_auto_auto]">
+    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px_180px_220px_auto_auto]">
       <Input
         className="bg-white"
         label="Search"
@@ -85,7 +85,9 @@ export function IssueFilterBar({
           value={`${filters.sortBy ?? "updatedAt"}:${filters.sortOrder ?? "desc"}`}
         >
           <option value="updatedAt:desc">Recently updated</option>
+          <option value="updatedAt:asc">Oldest updated</option>
           <option value="createdAt:desc">Recently created</option>
+          <option value="createdAt:asc">Oldest created</option>
           <option value="priority:desc">Priority high to low</option>
           <option value="priority:asc">Priority low to high</option>
         </select>

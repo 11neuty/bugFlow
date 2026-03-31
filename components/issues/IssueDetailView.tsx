@@ -18,8 +18,10 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import type { IssueDetailPayload, IssueSummary } from "@/lib/types";
+import type { CommentRecord, IssueDetailPayload, IssueSummary } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
+
+type CommentSortOrder = "desc" | "asc";
 
 function badgeToneForStatus(status: IssueSummary["status"]) {
   switch (status) {
@@ -49,6 +51,8 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
   const [detail, setDetail] = useState<IssueDetailPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [commentSortOrder, setCommentSortOrder] =
+    useState<CommentSortOrder>("desc");
 
   useEffect(() => {
     if (!isReady || !user) {
@@ -93,6 +97,17 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
     const result = await fetchIssueDetail(authorizedFetch, issueId);
     setDetail(result);
   };
+
+  const sortedComments = detail
+    ? [...detail.comments].sort((left: CommentRecord, right: CommentRecord) => {
+        const leftTimestamp = new Date(left.createdAt).getTime();
+        const rightTimestamp = new Date(right.createdAt).getTime();
+
+        return commentSortOrder === "desc"
+          ? rightTimestamp - leftTimestamp
+          : leftTimestamp - rightTimestamp;
+      })
+    : [];
 
   return (
     <AppShell
@@ -168,11 +183,27 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
             </Card>
 
             <Card className="p-6">
-              <div className="mb-5">
-                <h2 className="text-xl font-semibold text-slate-950">Comments</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Keep the handoff crisp so the next person can act quickly.
-                </p>
+              <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-950">Comments</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Keep the handoff crisp so the next person can act quickly.
+                  </p>
+                </div>
+
+                <label className="flex min-w-44 flex-col gap-2">
+                  <span className="text-sm font-medium text-slate-700">Sort by date</span>
+                  <select
+                    className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none focus:border-[color:var(--color-primary)]"
+                    onChange={(event) =>
+                      setCommentSortOrder(event.target.value as CommentSortOrder)
+                    }
+                    value={commentSortOrder}
+                  >
+                    <option value="desc">Newest first</option>
+                    <option value="asc">Oldest first</option>
+                  </select>
+                </label>
               </div>
 
               <CommentComposer
@@ -201,8 +232,8 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
               />
 
               <div className="mt-6 space-y-3">
-                {detail.comments.length > 0 ? (
-                  detail.comments.map((comment) => (
+                {sortedComments.length > 0 ? (
+                  sortedComments.map((comment) => (
                     <Card key={comment.id} className="rounded-[24px] p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
