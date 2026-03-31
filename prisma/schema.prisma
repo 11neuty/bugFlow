@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  QA
+  DEVELOPER
+}
+
+enum IssueStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum IssuePriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum IssueSeverity {
+  LOW
+  MEDIUM
+  CRITICAL
+}
+
+enum AuditAction {
+  ISSUE_CREATED
+  STATUS_CHANGED
+  ASSIGNMENT_CHANGED
+  ISSUE_DELETED
+}
+
+model User {
+  id             String         @id @default(cuid())
+  email          String         @unique
+  password       String
+  name           String
+  role           Role           @default(DEVELOPER)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  assignedIssues Issue[]        @relation("IssueAssignee")
+  reportedIssues Issue[]        @relation("IssueReporter")
+  comments       Comment[]
+  auditLogs      AuditLog[]
+  refreshTokens  RefreshToken[]
+}
+
+model Issue {
+  id          String         @id @default(cuid())
+  title       String
+  description String
+  status      IssueStatus    @default(TODO)
+  priority    IssuePriority  @default(MEDIUM)
+  severity    IssueSeverity  @default(MEDIUM)
+  version     Int            @default(1)
+  assigneeId  String?
+  reporterId  String
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  assignee    User?          @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  reporter    User           @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+  auditLogs   AuditLog[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([severity])
+  @@index([assigneeId])
+  @@index([reporterId])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([deletedAt])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  issueId   String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  issueId   String
+  action    AuditAction
+  userId    String
+  metadata  Json?
+  createdAt DateTime    @default(now())
+  issue     Issue       @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
