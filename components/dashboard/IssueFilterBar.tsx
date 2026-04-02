@@ -31,7 +31,7 @@ export function IssueFilterBar({
         className="bg-white"
         label="Search"
         onChange={(event) => onSearchChange(event.target.value)}
-        placeholder="Search title or description"
+        placeholder="Search title, description, or DF-0001"
         value={search}
       />
 
@@ -67,6 +67,7 @@ export function IssueFilterBar({
           <option value="">All statuses</option>
           <option value="TODO">Todo</option>
           <option value="IN_PROGRESS">In progress</option>
+          <option value="DONE">Done</option>
           <option value="CLOSED">Closed</option>
           <option value="REJECTED">Rejected</option>
         </select>

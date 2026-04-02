@@ -23,9 +23,14 @@ const columns: Array<{
     accent: "bg-amber-500",
   },
   {
+    status: "DONE",
+    label: "Done",
+    accent: "bg-emerald-500",
+  },
+  {
     status: "CLOSED",
     label: "Closed",
-    accent: "bg-emerald-500",
+    accent: "bg-sky-500",
   },
   {
     status: "REJECTED",
@@ -53,7 +58,7 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   if (loading) {
     return (
-      <div className="grid gap-4 xl:grid-cols-4">
+      <div className="grid gap-4 xl:grid-cols-5">
         {columns.map((column) => (
           <Card key={column.status} className="p-4">
             <div className="space-y-4">
@@ -96,7 +101,7 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-4">
+    <div className="grid gap-4 xl:grid-cols-5">
       {columns.map((column) => {
         const columnIssues = issues.filter((issue) => issue.status === column.status);
 

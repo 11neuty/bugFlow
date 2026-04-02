@@ -25,12 +25,27 @@ type CommentSortOrder = "desc" | "asc";
 
 function badgeToneForStatus(status: IssueSummary["status"]) {
   switch (status) {
-    case "CLOSED":
+    case "DONE":
       return "green";
+    case "CLOSED":
+      return "blue";
     case "REJECTED":
       return "red";
     case "IN_PROGRESS":
       return "amber";
+    default:
+      return "neutral";
+  }
+}
+
+function badgeToneForSeverity(severity: IssueSummary["severity"]) {
+  switch (severity) {
+    case "CRITICAL":
+      return "red";
+    case "HIGH":
+      return "amber";
+    case "MEDIUM":
+      return "blue";
     default:
       return "neutral";
   }
@@ -156,9 +171,14 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                   <Badge tone={badgeToneForPriority(detail.issue.priority)}>
                     {detail.issue.priority}
                   </Badge>
-                  <Badge tone="blue">{detail.issue.severity}</Badge>
+                  <Badge tone={badgeToneForSeverity(detail.issue.severity)}>
+                    {detail.issue.severity}
+                  </Badge>
                 </div>
                 <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    {detail.issue.issueKey}
+                  </p>
                   <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
                     {detail.issue.title}
                   </h1>
@@ -424,6 +444,7 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                   >
                     <option value="TODO">Todo</option>
                     <option value="IN_PROGRESS">In progress</option>
+                    <option value="DONE">Done</option>
                     <option value="CLOSED">Closed</option>
                     <option value="REJECTED">Rejected</option>
                   </select>

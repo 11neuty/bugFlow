@@ -17,6 +17,7 @@ enum Role {
 enum IssueStatus {
   TODO
   IN_PROGRESS
+  DONE
   CLOSED
   REJECTED
 }
@@ -30,6 +31,7 @@ enum IssuePriority {
 enum IssueSeverity {
   LOW
   MEDIUM
+  HIGH
   CRITICAL
 }
 
@@ -57,6 +59,7 @@ model User {
 
 model Issue {
   id          String         @id @default(cuid())
+  issueNumber Int            @unique @default(autoincrement())
   title       String
   description String
   status      IssueStatus    @default(TODO)
@@ -76,6 +79,7 @@ model Issue {
   @@index([status])
   @@index([priority])
   @@index([severity])
+  @@index([issueNumber])
   @@index([assigneeId])
   @@index([reporterId])
   @@index([createdAt])

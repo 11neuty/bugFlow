@@ -291,7 +291,7 @@ export function DashboardView() {
 
           pushToast({
             title: "Issue created",
-            description: `${result.issue.title} is ready for triage.`,
+            description: `${result.issue.issueKey} ${result.issue.title} is ready for triage.`,
             tone: "success",
           });
 

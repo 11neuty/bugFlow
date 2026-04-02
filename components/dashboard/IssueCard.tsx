@@ -22,10 +22,12 @@ function severityTone(severity: IssueSummary["severity"]) {
   switch (severity) {
     case "CRITICAL":
       return "red";
-    case "MEDIUM":
+    case "HIGH":
       return "amber";
-    default:
+    case "MEDIUM":
       return "blue";
+    default:
+      return "neutral";
   }
 }
 
@@ -48,6 +50,9 @@ export function IssueCard({ issue, onOpen }: IssueCardProps) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+            {issue.issueKey}
+          </p>
           <p className="text-sm font-semibold text-slate-950">{issue.title}</p>
           <p className="line-clamp-2 text-sm leading-6 text-slate-500">
             {issue.description}

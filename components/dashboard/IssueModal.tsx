@@ -55,7 +55,7 @@ export function IssueModal({
 
   return (
     <Modal
-      description="Capture enough detail for the assignee to act immediately."
+      description="Capture enough detail for the assignee to act immediately. BugFlow will assign the next issue key automatically."
       onClose={() => {
         if (!isSubmitting) {
           onClose();
@@ -174,6 +174,7 @@ export function IssueModal({
             >
               <option value="LOW">Low</option>
               <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
               <option value="CRITICAL">Critical</option>
             </select>
           </label>

@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { badRequest, conflict, notFound } from "@/lib/errors";
+import { formatIssueKey } from "@/lib/issues";
 import {
   assertCanAssignIssue,
   assertCanDeleteIssue,
@@ -28,6 +29,25 @@ import {
 
 const INACTIVE_ISSUE_STATUSES: IssueSummary["status"][] = ["CLOSED", "REJECTED"];
 
+function extractIssueNumber(query?: string) {
+  if (!query) {
+    return null;
+  }
+
+  const normalized = query.trim().toUpperCase();
+  const prefixedMatch = normalized.match(/\bDF-(\d{1,})\b/);
+
+  if (prefixedMatch) {
+    return Number.parseInt(prefixedMatch[1], 10);
+  }
+
+  if (/^\d+$/.test(normalized)) {
+    return Number.parseInt(normalized, 10);
+  }
+
+  return null;
+}
+
 function buildIssueWhere(
   filters: IssueFilters,
   options: {
@@ -35,6 +55,8 @@ function buildIssueWhere(
     ignoreStatus?: boolean;
   } = {},
 ): Prisma.IssueWhereInput {
+  const issueNumber = extractIssueNumber(filters.q);
+
   const status = options.activeOnly
     ? {
         notIn: INACTIVE_ISSUE_STATUSES,
@@ -64,6 +86,13 @@ function buildIssueWhere(
                 mode: "insensitive",
               },
             },
+            ...(issueNumber
+              ? [
+                  {
+                    issueNumber,
+                  },
+                ]
+              : []),
           ],
         }
       : {}),
@@ -164,7 +193,7 @@ export async function createIssue(
       userId: user.id,
       action: "ISSUE_CREATED",
       metadata: {
-        title: createdIssue.title,
+        title: `${formatIssueKey(createdIssue.issueNumber)} ${createdIssue.title}`,
         status: createdIssue.status,
         assignee: assignee?.name ?? "Unassigned",
       },

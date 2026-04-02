@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { formatIssueKey } from "@/lib/issues";
 import type {
   AuditLogRecord,
   CommentRecord,
@@ -88,6 +89,7 @@ export function serializeUser(user: SerializedUser): UserSummary {
 export function serializeIssue(issue: SerializedIssue): IssueSummary {
   return {
     id: issue.id,
+    issueKey: formatIssueKey(issue.issueNumber),
     title: issue.title,
     description: issue.description,
     status: issue.status,

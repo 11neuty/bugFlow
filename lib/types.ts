@@ -1,7 +1,7 @@
 export type Role = "ADMIN" | "QA" | "DEVELOPER";
-export type IssueStatus = "TODO" | "IN_PROGRESS" | "CLOSED" | "REJECTED";
+export type IssueStatus = "TODO" | "IN_PROGRESS" | "DONE" | "CLOSED" | "REJECTED";
 export type IssuePriority = "LOW" | "MEDIUM" | "HIGH";
-export type IssueSeverity = "LOW" | "MEDIUM" | "CRITICAL";
+export type IssueSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type AuditAction =
   | "ISSUE_CREATED"
   | "STATUS_CHANGED"
@@ -27,6 +27,7 @@ export interface UserSummary extends AuthUser {
 
 export interface IssueSummary {
   id: string;
+  issueKey: string;
   title: string;
   description: string;
   status: IssueStatus;

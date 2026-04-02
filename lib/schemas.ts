@@ -57,7 +57,7 @@ export const createIssueSchema = z.object({
     .min(10, "Description is required.")
     .max(MAX_ISSUE_DESCRIPTION_LENGTH),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM"),
-  severity: z.enum(["LOW", "MEDIUM", "CRITICAL"]).default("MEDIUM"),
+  severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
   assigneeId: optionalString,
 });
 
@@ -65,9 +65,9 @@ export const updateIssueSchema = z
   .object({
     title: optionalString,
     description: optionalString,
-    status: z.enum(["TODO", "IN_PROGRESS", "CLOSED", "REJECTED"]).optional(),
+    status: z.enum(["TODO", "IN_PROGRESS", "DONE", "CLOSED", "REJECTED"]).optional(),
     priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
-    severity: z.enum(["LOW", "MEDIUM", "CRITICAL"]).optional(),
+    severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
     assigneeId: z.string().trim().nullable().optional(),
     version: z.number().int().positive("Version is required."),
   })
@@ -96,9 +96,9 @@ export const issueQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).default(12),
   q: optionalString,
-  status: z.enum(["TODO", "IN_PROGRESS", "CLOSED", "REJECTED"]).optional(),
+  status: z.enum(["TODO", "IN_PROGRESS", "DONE", "CLOSED", "REJECTED"]).optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
-  severity: z.enum(["LOW", "MEDIUM", "CRITICAL"]).optional(),
+  severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
   assigneeId: optionalString,
   sortBy: z.enum(ISSUE_SORT_FIELDS).default("updatedAt"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),

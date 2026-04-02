@@ -61,10 +61,11 @@ export function validateStatusTransition(
   }
 
   const allowedTransitions: Record<IssueStatus, IssueStatus[]> = {
-    TODO: ["IN_PROGRESS", "CLOSED", "REJECTED"],
-    IN_PROGRESS: ["TODO", "CLOSED", "REJECTED"],
-    CLOSED: ["TODO"],
-    REJECTED: ["TODO"],
+    TODO: ["IN_PROGRESS"],
+    IN_PROGRESS: ["TODO", "DONE"],
+    DONE: ["IN_PROGRESS"],
+    CLOSED: [],
+    REJECTED: [],
   };
 
   if (!allowedTransitions[issue.status].includes(nextStatus)) {
