@@ -2,10 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bug, LayoutPanelTop, LogOut, ShieldCheck } from "lucide-react";
+import {
+  Bug,
+  FolderKanban,
+  FolderPlus,
+  LayoutPanelTop,
+  LogOut,
+  ShieldCheck,
+} from "lucide-react";
 import { useEffect } from "react";
 
+import { ProjectModal } from "@/components/dashboard/ProjectModal";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { useProjects } from "@/components/providers/ProjectProvider";
+import { useToast } from "@/components/providers/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
@@ -34,6 +44,18 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const { user, isReady, logout } = useAuth();
+  const { pushToast } = useToast();
+  const {
+    closeCreateProjectModal,
+    createProject,
+    isLoading: isLoadingProjects,
+    isCreateModalOpen,
+    isReady: areProjectsReady,
+    openCreateProjectModal,
+    projects,
+    selectProject,
+    selectedProjectId,
+  } = useProjects();
 
   useEffect(() => {
     if (isReady && !user) {
@@ -145,13 +167,74 @@ export function AppShell({
                   </p>
                 </div>
               </div>
-              {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="flex min-w-[240px] flex-col gap-2">
+                  <span className="text-sm font-medium text-slate-700">Project</span>
+                  <div className="relative">
+                    <FolderKanban className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                    <select
+                      className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-900 outline-none focus:border-[color:var(--color-primary)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                      disabled={isLoadingProjects || !areProjectsReady || projects.length === 0}
+                      onChange={(event) => selectProject(event.target.value)}
+                      value={selectedProjectId ?? ""}
+                    >
+                      {projects.length === 0 ? (
+                        <option value="">
+                          {isLoadingProjects ? "Loading projects..." : "Create a project"}
+                        </option>
+                      ) : null}
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </label>
+
+                <Button
+                  leadingIcon={<FolderPlus className="size-4" />}
+                  onClick={openCreateProjectModal}
+                  variant="secondary"
+                >
+                  New project
+                </Button>
+
+                {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
+              </div>
             </div>
           </Card>
 
           <div className="flex-1">{children}</div>
         </div>
       </div>
+
+      <ProjectModal
+        onClose={closeCreateProjectModal}
+        onSubmit={async (input) => {
+          try {
+            const project = await createProject(input.name);
+
+            pushToast({
+              title: "Project created",
+              description: `${project.name} is ready for issue tracking.`,
+              tone: "success",
+            });
+            closeCreateProjectModal();
+          } catch (error) {
+            pushToast({
+              title: "Project creation failed",
+              description:
+                error instanceof Error
+                  ? error.message
+                  : "Unable to create the project right now.",
+              tone: "error",
+            });
+            throw error;
+          }
+        }}
+        open={isCreateModalOpen}
+      />
     </div>
   );
 }

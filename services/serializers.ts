@@ -5,6 +5,7 @@ import type {
   AuditLogRecord,
   CommentRecord,
   IssueSummary,
+  ProjectSummary,
   UserSummary,
 } from "@/lib/types";
 
@@ -16,7 +17,16 @@ export const userSummarySelect = {
   createdAt: true,
 } satisfies Prisma.UserSelect;
 
+export const projectSummarySelect = {
+  id: true,
+  name: true,
+  createdAt: true,
+} satisfies Prisma.ProjectSelect;
+
 export const issueSummaryInclude = {
+  project: {
+    select: projectSummarySelect,
+  },
   assignee: {
     select: userSummarySelect,
   },
@@ -39,6 +49,10 @@ export const auditLogWithUserInclude = {
 
 type SerializedUser = Prisma.UserGetPayload<{
   select: typeof userSummarySelect;
+}>;
+
+type SerializedProject = Prisma.ProjectGetPayload<{
+  select: typeof projectSummarySelect;
 }>;
 
 type SerializedIssue = Prisma.IssueGetPayload<{
@@ -86,6 +100,14 @@ export function serializeUser(user: SerializedUser): UserSummary {
   };
 }
 
+export function serializeProject(project: SerializedProject): ProjectSummary {
+  return {
+    id: project.id,
+    name: project.name,
+    createdAt: project.createdAt.toISOString(),
+  };
+}
+
 export function serializeIssue(issue: SerializedIssue): IssueSummary {
   return {
     id: issue.id,
@@ -98,6 +120,7 @@ export function serializeIssue(issue: SerializedIssue): IssueSummary {
     version: issue.version,
     createdAt: issue.createdAt.toISOString(),
     updatedAt: issue.updatedAt.toISOString(),
+    project: serializeProject(issue.project),
     assignee: issue.assignee ? serializeUser(issue.assignee) : null,
     reporter: serializeUser(issue.reporter),
   };

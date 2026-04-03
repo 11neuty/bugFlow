@@ -62,6 +62,7 @@ export function IssueCard({ issue, onOpen }: IssueCardProps) {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
+        <Badge tone="neutral">{issue.project.name}</Badge>
         <Badge tone={priorityTone(issue.priority)}>
           <Flag className="mr-1 inline size-3" />
           {issue.priority}

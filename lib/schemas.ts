@@ -9,6 +9,7 @@ import {
   MAX_NAME_LENGTH,
   MAX_PAGE_SIZE,
   MAX_PASSWORD_LENGTH,
+  MAX_PROJECT_NAME_LENGTH,
 } from "@/lib/constants";
 
 const optionalString = z
@@ -16,6 +17,18 @@ const optionalString = z
   .trim()
   .transform((value) => value || undefined)
   .optional();
+
+const optionalUuid = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const normalized = value.trim();
+    return normalized || undefined;
+  },
+  z.string().uuid("Invalid project ID.").optional(),
+);
 
 export const registerSchema = z.object({
   name: z.string().trim().min(2, "Name is required.").max(MAX_NAME_LENGTH),
@@ -58,7 +71,16 @@ export const createIssueSchema = z.object({
     .max(MAX_ISSUE_DESCRIPTION_LENGTH),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM"),
   severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
+  projectId: optionalUuid,
   assigneeId: optionalString,
+});
+
+export const createProjectSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Project name is required.")
+    .max(MAX_PROJECT_NAME_LENGTH, "Project name is too long."),
 });
 
 export const updateIssueSchema = z
@@ -95,6 +117,7 @@ export const createCommentSchema = z.object({
 export const issueQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).default(12),
+  projectId: optionalUuid,
   q: optionalString,
   status: z.enum(["TODO", "IN_PROGRESS", "DONE", "CLOSED", "REJECTED"]).optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),

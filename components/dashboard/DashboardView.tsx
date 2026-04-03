@@ -11,6 +11,7 @@ import {
 } from "@/api/issues";
 import { createUserRequest, fetchUsers } from "@/api/users";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { useProjects } from "@/components/providers/ProjectProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { IssueFilterBar } from "@/components/dashboard/IssueFilterBar";
 import { IssueModal } from "@/components/dashboard/IssueModal";
@@ -31,6 +32,13 @@ const initialFilters: IssueFilters = {
 export function DashboardView() {
   const router = useRouter();
   const { authorizedFetch, isReady, user } = useAuth();
+  const {
+    isReady: areProjectsReady,
+    openCreateProjectModal,
+    refreshProjects,
+    selectedProject,
+    selectedProjectId,
+  } = useProjects();
   const { pushToast } = useToast();
   const [filters, setFilters] = useState<IssueFilters>(initialFilters);
   const [search, setSearch] = useState("");
@@ -61,7 +69,20 @@ export function DashboardView() {
   }, [deferredSearch]);
 
   useEffect(() => {
-    if (!isReady || !user) {
+    startTransition(() => {
+      setFilters((current) => ({
+        ...current,
+        page: 1,
+      }));
+    });
+  }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (!isReady || !user || !areProjectsReady) {
+      return;
+    }
+
+    if (!selectedProjectId) {
       return;
     }
 
@@ -73,7 +94,10 @@ export function DashboardView() {
 
       try {
         const [issueResult, userResult] = await Promise.all([
-          fetchIssues(authorizedFetch, filters),
+          fetchIssues(authorizedFetch, {
+            ...filters,
+            projectId: selectedProjectId,
+          }),
           fetchUsers(authorizedFetch),
         ]);
 
@@ -110,14 +134,22 @@ export function DashboardView() {
     return () => {
       cancelled = true;
     };
-  }, [authorizedFetch, filters, isReady, user]);
+  }, [authorizedFetch, areProjectsReady, filters, isReady, selectedProjectId, user]);
 
   const refreshBoard = async () => {
+    if (!selectedProjectId) {
+      await refreshProjects();
+      return;
+    }
+
     setIsRefreshing(true);
 
     try {
       const [issueResult, userResult] = await Promise.all([
-        fetchIssues(authorizedFetch, filters),
+        fetchIssues(authorizedFetch, {
+          ...filters,
+          projectId: selectedProjectId,
+        }),
         fetchUsers(authorizedFetch),
       ]);
 
@@ -165,124 +197,139 @@ export function DashboardView() {
       subtitle="Track work across the board, capture fresh reports, and move issues through the workflow with optimistic updates."
       title="Dashboard"
     >
-      <div className="space-y-4">
-        <Card className="p-5">
-          <IssueFilterBar
-            filters={filters}
-            isRefreshing={isRefreshing}
-            onCreateIssue={() => setIsCreateOpen(true)}
-            onFiltersChange={(nextFilters) => {
-              startTransition(() => {
-                setFilters((current) => ({
-                  ...current,
-                  page: 1,
-                  ...nextFilters,
-                }));
-              });
-            }}
-            onRefresh={() => void refreshBoard()}
-            onSearchChange={setSearch}
-            search={search}
-          />
-        </Card>
+      {selectedProject ? (
+        <div className="space-y-4">
+          <Card className="p-5">
+            <IssueFilterBar
+              filters={filters}
+              isRefreshing={isRefreshing}
+              onCreateIssue={() => setIsCreateOpen(true)}
+              onFiltersChange={(nextFilters) => {
+                startTransition(() => {
+                  setFilters((current) => ({
+                    ...current,
+                    page: 1,
+                    ...nextFilters,
+                  }));
+                });
+              }}
+              onRefresh={() => void refreshBoard()}
+              onSearchChange={setSearch}
+              search={search}
+            />
+          </Card>
 
-        <KanbanBoard
-          error={error}
-          issues={issues}
-          loading={loading}
-          onMoveIssue={async (issueId, status) => {
-            const issue = issues.find((item) => item.id === issueId);
+          <KanbanBoard
+            error={error}
+            issues={issues}
+            loading={loading}
+            onMoveIssue={async (issueId, status) => {
+              const issue = issues.find((item) => item.id === issueId);
 
-            if (!issue || issue.status === status) {
-              return;
-            }
+              if (!issue || issue.status === status) {
+                return;
+              }
 
-            const previousIssues = issues;
-
-            setIssues((currentIssues) =>
-              currentIssues.map((item) =>
-                item.id === issueId ? { ...item, status } : item,
-              ),
-            );
-
-            try {
-              const result = await updateIssueRequest(authorizedFetch, issueId, {
-                status,
-                version: issue.version,
-              });
+              const previousIssues = issues;
 
               setIssues((currentIssues) =>
                 currentIssues.map((item) =>
-                  item.id === issueId ? result.issue : item,
+                  item.id === issueId ? { ...item, status } : item,
                 ),
               );
-              await refreshBoard();
 
-              pushToast({
-                title: "Issue moved",
-                description: `Moved to ${status.replace("_", " ").toLowerCase()}.`,
-                tone: "success",
-              });
-            } catch (moveError) {
-              setIssues(previousIssues);
-              await refreshBoard();
-              pushToast({
-                title: "Unable to move issue",
-                description:
-                  moveError instanceof Error
-                    ? moveError.message
-                    : "The issue changed before your update completed.",
-                tone: "error",
-              });
-            }
-          }}
-          onOpenIssue={(issueId) => router.push(`/issues/${issueId}`)}
-          onRetry={() => void refreshBoard()}
-        />
+              try {
+                const result = await updateIssueRequest(authorizedFetch, issueId, {
+                  status,
+                  version: issue.version,
+                });
 
-        <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-950">
-              Page {meta.page} of {meta.totalPages}
-            </p>
-            <p className="text-sm text-slate-500">
-              Showing up to {meta.limit} issues per page.
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              onClick={() =>
-                startTransition(() => {
-                  setFilters((current) => ({
-                    ...current,
-                    page: Math.max(1, (current.page ?? 1) - 1),
-                  }));
-                })
+                setIssues((currentIssues) =>
+                  currentIssues.map((item) =>
+                    item.id === issueId ? result.issue : item,
+                  ),
+                );
+                await refreshBoard();
+
+                pushToast({
+                  title: "Issue moved",
+                  description: `Moved to ${status.replace("_", " ").toLowerCase()}.`,
+                  tone: "success",
+                });
+              } catch (moveError) {
+                setIssues(previousIssues);
+                await refreshBoard();
+                pushToast({
+                  title: "Unable to move issue",
+                  description:
+                    moveError instanceof Error
+                      ? moveError.message
+                      : "The issue changed before your update completed.",
+                  tone: "error",
+                });
               }
-              variant="secondary"
-              disabled={meta.page <= 1}
-            >
-              Previous
-            </Button>
-            <Button
-              onClick={() =>
-                startTransition(() => {
-                  setFilters((current) => ({
-                    ...current,
-                    page: Math.min(meta.totalPages, (current.page ?? 1) + 1),
-                  }));
-                })
-              }
-              variant="secondary"
-              disabled={meta.page >= meta.totalPages}
-            >
-              Next
-            </Button>
+            }}
+            onOpenIssue={(issueId) => router.push(`/issues/${issueId}`)}
+            onRetry={() => void refreshBoard()}
+          />
+
+          <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-950">
+                Page {meta.page} of {meta.totalPages}
+              </p>
+              <p className="text-sm text-slate-500">
+                Showing up to {meta.limit} issues per page.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                onClick={() =>
+                  startTransition(() => {
+                    setFilters((current) => ({
+                      ...current,
+                      page: Math.max(1, (current.page ?? 1) - 1),
+                    }));
+                  })
+                }
+                variant="secondary"
+                disabled={meta.page <= 1}
+              >
+                Previous
+              </Button>
+              <Button
+                onClick={() =>
+                  startTransition(() => {
+                    setFilters((current) => ({
+                      ...current,
+                      page: Math.min(meta.totalPages, (current.page ?? 1) + 1),
+                    }));
+                  })
+                }
+                variant="secondary"
+                disabled={meta.page >= meta.totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </Card>
+        </div>
+      ) : (
+        <Card className="p-8 text-center">
+          <p className="text-lg font-semibold text-slate-950">
+            Select a project to get started
+          </p>
+          <p className="mt-2 text-sm text-slate-500">
+            Issues, board states, and comments stay organized per workspace.
+          </p>
+          <div className="mt-5 flex justify-center">
+            <Button onClick={openCreateProjectModal}>Create Project</Button>
           </div>
         </Card>
-      </div>
+      )}
 
       <IssueModal
+        project={selectedProject}
         currentUserRole={user?.role ?? "DEVELOPER"}
         members={members}
         onClose={() => setIsCreateOpen(false)}

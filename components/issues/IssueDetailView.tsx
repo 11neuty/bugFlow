@@ -11,6 +11,7 @@ import {
   updateIssueRequest,
 } from "@/api/issues";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { useProjects } from "@/components/providers/ProjectProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { AuditLogList } from "@/components/issues/AuditLogList";
 import { CommentComposer } from "@/components/issues/CommentComposer";
@@ -64,6 +65,7 @@ function badgeToneForPriority(priority: IssueSummary["priority"]) {
 
 export function IssueDetailView({ issueId }: { issueId: string }) {
   const { authorizedFetch, isReady, user } = useAuth();
+  const { selectProject, selectedProjectId } = useProjects();
   const { pushToast } = useToast();
   const [detail, setDetail] = useState<IssueDetailPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,6 +89,10 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
 
         if (!cancelled) {
           setDetail(result);
+
+          if (result.issue.project.id !== selectedProjectId) {
+            selectProject(result.issue.project.id);
+          }
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -108,10 +114,13 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [authorizedFetch, isReady, issueId, user]);
+  }, [authorizedFetch, isReady, issueId, selectProject, selectedProjectId, user]);
 
   const reloadIssue = async () => {
     const result = await fetchIssueDetail(authorizedFetch, issueId);
+    if (result.issue.project.id !== selectedProjectId) {
+      selectProject(result.issue.project.id);
+    }
     setDetail(result);
   };
 
@@ -165,6 +174,7 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
             <Card className="p-6">
               <div className="flex flex-col gap-5">
                 <div className="flex flex-wrap gap-2">
+                  <Badge tone="neutral">{detail.issue.project.name}</Badge>
                   <Badge tone={badgeToneForStatus(detail.issue.status)}>
                     {detail.issue.status}
                   </Badge>
@@ -187,6 +197,14 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                   </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                      Project
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-slate-950">
+                      {detail.issue.project.name}
+                    </p>
+                  </div>
                   <div>
                     <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
                       Reporter

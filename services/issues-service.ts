@@ -17,6 +17,10 @@ import type {
 } from "@/lib/types";
 import { createAuditLog } from "@/services/audit-log-service";
 import {
+  getOrCreateDefaultProject,
+  getProjectById,
+} from "@/services/project-service";
+import {
   auditLogWithUserInclude,
   commentWithUserInclude,
   issueSummaryInclude,
@@ -67,6 +71,7 @@ function buildIssueWhere(
 
   return {
     deletedAt: null,
+    projectId: filters.projectId,
     status,
     priority: filters.priority,
     severity: filters.severity,
@@ -129,7 +134,20 @@ async function resolveAssignee(user: AuthUser, assigneeId?: string | null) {
   return assignee;
 }
 
+async function resolveProject(projectId?: string | null) {
+  if (!projectId) {
+    console.warn("projectId missing, using default project");
+    return getOrCreateDefaultProject();
+  }
+
+  return getProjectById(projectId);
+}
+
 export async function listIssues(filters: IssueFilters) {
+  if (filters.projectId) {
+    await getProjectById(filters.projectId);
+  }
+
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 12;
   const skip = (page - 1) * limit;
@@ -170,9 +188,11 @@ export async function createIssue(
     description: string;
     priority: IssueSummary["priority"];
     severity: IssueSummary["severity"];
+    projectId?: string;
     assigneeId?: string;
   },
 ) {
+  const project = await resolveProject(input.projectId);
   const assignee = await resolveAssignee(user, input.assigneeId);
 
   const issue = await prisma.$transaction(async (tx) => {
@@ -180,6 +200,7 @@ export async function createIssue(
       data: {
         title: input.title,
         description: input.description,
+        projectId: project.id,
         priority: input.priority,
         severity: input.severity,
         assigneeId: assignee?.id ?? null,
@@ -196,6 +217,7 @@ export async function createIssue(
         title: `${formatIssueKey(createdIssue.issueNumber)} ${createdIssue.title}`,
         status: createdIssue.status,
         assignee: assignee?.name ?? "Unassigned",
+        project: project.name,
       },
     });
 

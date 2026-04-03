@@ -22,6 +22,10 @@ function buildIssueQuery(filters: IssueFilters) {
     params.set("limit", String(filters.limit));
   }
 
+  if (filters.projectId) {
+    params.set("projectId", filters.projectId);
+  }
+
   if (filters.q) {
     params.set("q", filters.q);
   }
@@ -70,6 +74,7 @@ export function createIssueRequest(
     description: string;
     priority: IssueSummary["priority"];
     severity: IssueSummary["severity"];
+    projectId?: string;
     assigneeId?: string;
   },
 ) {

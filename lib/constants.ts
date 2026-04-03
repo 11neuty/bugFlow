@@ -6,6 +6,7 @@ export const DEFAULT_PAGE = 1;
 export const DEFAULT_PAGE_SIZE = 12;
 export const MAX_PAGE_SIZE = 50;
 export const MAX_NAME_LENGTH = 64;
+export const MAX_PROJECT_NAME_LENGTH = 80;
 export const MAX_EMAIL_LENGTH = 254;
 export const MAX_PASSWORD_LENGTH = 72;
 export const MAX_ISSUE_TITLE_LENGTH = 120;

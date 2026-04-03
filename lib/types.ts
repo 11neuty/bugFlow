@@ -25,6 +25,12 @@ export interface UserSummary extends AuthUser {
   createdAt: string;
 }
 
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface IssueSummary {
   id: string;
   issueKey: string;
@@ -36,6 +42,7 @@ export interface IssueSummary {
   version: number;
   createdAt: string;
   updatedAt: string;
+  project: ProjectSummary;
   assignee: UserSummary | null;
   reporter: UserSummary;
 }
@@ -83,6 +90,7 @@ export interface CommentListPayload {
 export interface IssueFilters {
   page?: number;
   limit?: number;
+  projectId?: string;
   q?: string;
   status?: IssueStatus;
   priority?: IssuePriority;

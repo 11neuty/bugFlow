@@ -9,11 +9,17 @@ import {
   MAX_ISSUE_DESCRIPTION_LENGTH,
   MAX_ISSUE_TITLE_LENGTH,
 } from "@/lib/constants";
-import type { IssueSummary, Role, UserSummary } from "@/lib/types";
+import type {
+  IssueSummary,
+  ProjectSummary,
+  Role,
+  UserSummary,
+} from "@/lib/types";
 
 interface IssueModalProps {
   open: boolean;
   members: UserSummary[];
+  project: ProjectSummary | null;
   currentUserRole: Role;
   onClose: () => void;
   onSubmit: (input: {
@@ -21,6 +27,7 @@ interface IssueModalProps {
     description: string;
     priority: IssueSummary["priority"];
     severity: IssueSummary["severity"];
+    projectId: string;
     assigneeId?: string;
   }) => Promise<void>;
 }
@@ -36,6 +43,7 @@ const initialState = {
 export function IssueModal({
   open,
   members,
+  project,
   currentUserRole,
   onClose,
   onSubmit,
@@ -71,11 +79,16 @@ export function IssueModal({
           setIsSubmitting(true);
 
           try {
+            if (!project) {
+              return;
+            }
+
             await onSubmit({
               title: formState.title,
               description: formState.description,
               priority: formState.priority,
               severity: formState.severity,
+              projectId: project.id,
               assigneeId: formState.assigneeId || undefined,
             });
             onClose();
@@ -84,6 +97,15 @@ export function IssueModal({
           }
         }}
       >
+        <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+            Project
+          </p>
+          <p className="mt-2 text-sm font-medium text-slate-950">
+            {project?.name ?? "Select a project first"}
+          </p>
+        </div>
+
         <div className="grid gap-5 md:grid-cols-2">
           <Input
             label="Title"
@@ -184,7 +206,7 @@ export function IssueModal({
           <Button onClick={onClose} type="button" variant="ghost">
             Cancel
           </Button>
-          <Button loading={isSubmitting} type="submit">
+          <Button disabled={!project} loading={isSubmitting} type="submit">
             Create issue
           </Button>
         </div>

@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import { PrismaClient, Role } from "@prisma/client";
 
 const prisma = new PrismaClient();
+const DEFAULT_PROJECT_NAME = "Default Project";
 
 const users = [
   {
@@ -25,6 +26,16 @@ const users = [
 ];
 
 async function main() {
+  await prisma.project.upsert({
+    where: { name: DEFAULT_PROJECT_NAME },
+    update: {
+      name: DEFAULT_PROJECT_NAME,
+    },
+    create: {
+      name: DEFAULT_PROJECT_NAME,
+    },
+  });
+
   for (const user of users) {
     const password = await bcrypt.hash(user.password, 10);
 
