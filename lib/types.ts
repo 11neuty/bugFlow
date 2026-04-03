@@ -10,6 +10,10 @@ export type AuditAction =
   | "PRIORITY_CHANGED"
   | "COMMENT_ADDED"
   | "ISSUE_DELETED";
+export type NotificationType =
+  | "ISSUE_ASSIGNED"
+  | "ISSUE_COMMENTED"
+  | "ISSUE_STATUS_CHANGED";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -63,6 +67,22 @@ export interface CommentRecord {
   user: UserSummary;
 }
 
+export interface NotificationIssueReference {
+  id: string;
+  issueKey: string;
+  title: string;
+  project: ProjectSummary;
+}
+
+export interface NotificationRecord {
+  id: string;
+  type: NotificationType;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  issue: NotificationIssueReference | null;
+}
+
 export interface AuditLogRecord {
   id: string;
   action: AuditAction;
@@ -94,6 +114,10 @@ export interface IssueDetailPayload {
 
 export interface CommentListPayload {
   comments: CommentRecord[];
+}
+
+export interface NotificationUnreadCountPayload {
+  unreadCount: number;
 }
 
 export interface IssueFilters {

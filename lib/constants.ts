@@ -13,6 +13,7 @@ export const MAX_ISSUE_TITLE_LENGTH = 120;
 export const MAX_ISSUE_DESCRIPTION_LENGTH = 4000;
 export const MAX_COMMENT_LENGTH = 1000;
 export const ACTIVITY_LOG_LIMIT = 50;
+export const NOTIFICATION_LIMIT = 20;
 
 export const ISSUE_SORT_FIELDS = ["createdAt", "updatedAt", "priority"] as const;
 

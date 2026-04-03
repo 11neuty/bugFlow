@@ -17,6 +17,7 @@ import type {
   IssueSummary,
 } from "@/lib/types";
 import { createAuditLog } from "@/services/audit-log-service";
+import { createNotification } from "@/services/notification-service";
 import {
   getOrCreateDefaultProject,
   getProjectById,
@@ -220,6 +221,16 @@ export async function createIssue(
       },
     });
 
+    if (assignee?.id && assignee.id !== user.id) {
+      await createNotification(tx, {
+        userId: assignee.id,
+        issueId: createdIssue.id,
+        type: "ISSUE_ASSIGNED",
+        message: `You were assigned to issue ${formatIssueKey(createdIssue.issueNumber)}`,
+        dedupeKey: `issue-assigned:create:${createdIssue.id}:${assignee.id}`,
+      });
+    }
+
     return createdIssue;
   });
 
@@ -373,6 +384,16 @@ export async function updateIssue(
           to: nextIssue.assignee?.name ?? null,
         },
       });
+
+      if (nextIssue.assigneeId && nextIssue.assigneeId !== user.id) {
+        await createNotification(tx, {
+          userId: nextIssue.assigneeId,
+          issueId: id,
+          type: "ISSUE_ASSIGNED",
+          message: `You were assigned to issue ${formatIssueKey(nextIssue.issueNumber)}`,
+          dedupeKey: `issue-assigned:update:${id}:${nextIssue.version}:${nextIssue.assigneeId}`,
+        });
+      }
     }
 
     if (input.priority && input.priority !== existingIssue.priority) {
@@ -384,6 +405,21 @@ export async function updateIssue(
           from: existingIssue.priority,
           to: input.priority,
         },
+      });
+    }
+
+    if (
+      input.status &&
+      input.status !== existingIssue.status &&
+      nextIssue.assigneeId &&
+      nextIssue.assigneeId !== user.id
+    ) {
+      await createNotification(tx, {
+        userId: nextIssue.assigneeId,
+        issueId: id,
+        type: "ISSUE_STATUS_CHANGED",
+        message: `Status changed to ${input.status}`,
+        dedupeKey: `issue-status:${id}:${nextIssue.version}:${input.status}:${nextIssue.assigneeId}`,
       });
     }
 

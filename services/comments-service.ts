@@ -1,7 +1,9 @@
 import { notFound } from "@/lib/errors";
+import { formatIssueKey } from "@/lib/issues";
 import { prisma } from "@/lib/prisma";
 import type { AuthUser } from "@/lib/types";
 import { createAuditLog } from "@/services/audit-log-service";
+import { createNotification } from "@/services/notification-service";
 import { commentWithUserInclude, serializeComment } from "@/services/serializers";
 
 async function ensureIssueExists(issueId: string) {
@@ -51,6 +53,8 @@ export async function createComment(
       },
       select: {
         id: true,
+        issueNumber: true,
+        assigneeId: true,
       },
     });
 
@@ -79,6 +83,16 @@ export async function createComment(
             : input.content,
       },
     });
+
+    if (issue.assigneeId && issue.assigneeId !== user.id) {
+      await createNotification(tx, {
+        userId: issue.assigneeId,
+        issueId,
+        type: "ISSUE_COMMENTED",
+        message: `New comment on ${formatIssueKey(issue.issueNumber)}`,
+        dedupeKey: `issue-commented:${createdComment.id}:${issue.assigneeId}`,
+      });
+    }
 
     return createdComment;
   });

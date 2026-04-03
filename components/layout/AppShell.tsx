@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { ProjectDeleteModal } from "@/components/dashboard/ProjectDeleteModal";
+import { NotificationMenu } from "@/components/layout/NotificationMenu";
 import { ProjectModal } from "@/components/dashboard/ProjectModal";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useProjects } from "@/components/providers/ProjectProvider";
@@ -208,6 +209,8 @@ export function AppShell({
                 >
                   New project
                 </Button>
+
+                <NotificationMenu />
 
                 {selectedProject &&
                 selectedProject.name !== DEFAULT_PROJECT_NAME ? (

@@ -45,6 +45,12 @@ enum AuditAction {
   ISSUE_DELETED
 }
 
+enum NotificationType {
+  ISSUE_ASSIGNED
+  ISSUE_COMMENTED
+  ISSUE_STATUS_CHANGED
+}
+
 model Project {
   id        String   @id @default(uuid())
   name      String   @unique
@@ -68,6 +74,7 @@ model User {
   reportedIssues Issue[]        @relation("IssueReporter")
   comments       Comment[]
   auditLogs      AuditLog[]
+  notifications  Notification[]
   refreshTokens  RefreshToken[]
 }
 
@@ -91,6 +98,7 @@ model Issue {
   reporter    User           @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: Cascade)
   comments    Comment[]
   auditLogs   AuditLog[]
+  notifications Notification[]
 
   @@index([projectId])
   @@index([status])
@@ -146,4 +154,21 @@ model RefreshToken {
   @@index([userId])
   @@index([expiresAt])
   @@index([revokedAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  issueId   String?
+  type      NotificationType
+  message   String
+  dedupeKey String?          @unique
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issue     Issue?           @relation(fields: [issueId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@index([issueId])
 }

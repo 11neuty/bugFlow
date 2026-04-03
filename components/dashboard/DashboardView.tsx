@@ -16,6 +16,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { IssueFilterBar } from "@/components/dashboard/IssueFilterBar";
 import { IssueModal } from "@/components/dashboard/IssueModal";
 import { KanbanBoard } from "@/components/dashboard/KanbanBoard";
+import { useNotifications } from "@/components/providers/NotificationProvider";
 import { UserModal } from "@/components/dashboard/UserModal";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
@@ -39,6 +40,7 @@ export function DashboardView() {
     selectedProject,
     selectedProjectId,
   } = useProjects();
+  const { refreshNotifications } = useNotifications();
   const { pushToast } = useToast();
   const [filters, setFilters] = useState<IssueFilters>(initialFilters);
   const [search, setSearch] = useState("");
@@ -250,6 +252,7 @@ export function DashboardView() {
                   ),
                 );
                 await refreshBoard();
+                await refreshNotifications({ silent: true }).catch(() => undefined);
 
                 pushToast({
                   title: "Issue moved",
@@ -343,6 +346,7 @@ export function DashboardView() {
           });
 
           await refreshBoard();
+          await refreshNotifications({ silent: true }).catch(() => undefined);
         }}
         open={isCreateOpen}
       />

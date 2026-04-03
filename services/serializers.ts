@@ -5,6 +5,8 @@ import type {
   AuditLogRecord,
   CommentRecord,
   IssueSummary,
+  NotificationIssueReference,
+  NotificationRecord,
   ProjectSummary,
   UserSummary,
 } from "@/lib/types";
@@ -47,6 +49,19 @@ export const auditLogWithUserInclude = {
   },
 } satisfies Prisma.AuditLogInclude;
 
+export const notificationWithIssueInclude = {
+  issue: {
+    select: {
+      id: true,
+      issueNumber: true,
+      title: true,
+      project: {
+        select: projectSummarySelect,
+      },
+    },
+  },
+} satisfies Prisma.NotificationInclude;
+
 type SerializedUser = Prisma.UserGetPayload<{
   select: typeof userSummarySelect;
 }>;
@@ -65,6 +80,10 @@ type SerializedComment = Prisma.CommentGetPayload<{
 
 type SerializedAuditLog = Prisma.AuditLogGetPayload<{
   include: typeof auditLogWithUserInclude;
+}>;
+
+type SerializedNotification = Prisma.NotificationGetPayload<{
+  include: typeof notificationWithIssueInclude;
 }>;
 
 function normalizeAuditMetadata(
@@ -145,5 +164,29 @@ export function serializeAuditLog(
     metadata: normalizeAuditMetadata(log.metadata, userNameById),
     createdAt: log.createdAt.toISOString(),
     user: serializeUser(log.user),
+  };
+}
+
+function serializeNotificationIssue(
+  issue: NonNullable<SerializedNotification["issue"]>,
+): NotificationIssueReference {
+  return {
+    id: issue.id,
+    issueKey: formatIssueKey(issue.issueNumber),
+    title: issue.title,
+    project: serializeProject(issue.project),
+  };
+}
+
+export function serializeNotification(
+  notification: SerializedNotification,
+): NotificationRecord {
+  return {
+    id: notification.id,
+    type: notification.type,
+    message: notification.message,
+    isRead: notification.isRead,
+    createdAt: notification.createdAt.toISOString(),
+    issue: notification.issue ? serializeNotificationIssue(notification.issue) : null,
   };
 }

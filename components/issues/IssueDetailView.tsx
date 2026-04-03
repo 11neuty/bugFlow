@@ -12,6 +12,7 @@ import {
 } from "@/api/issues";
 import { ActivityTimeline } from "@/components/issues/ActivityTimeline";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { useNotifications } from "@/components/providers/NotificationProvider";
 import { useProjects } from "@/components/providers/ProjectProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { CommentComposer } from "@/components/issues/CommentComposer";
@@ -65,6 +66,7 @@ function badgeToneForPriority(priority: IssueSummary["priority"]) {
 
 export function IssueDetailView({ issueId }: { issueId: string }) {
   const { authorizedFetch, isReady, user } = useAuth();
+  const { refreshNotifications } = useNotifications();
   const { selectProject, selectedProjectId } = useProjects();
   const { pushToast } = useToast();
   const [detail, setDetail] = useState<IssueDetailPayload | null>(null);
@@ -276,6 +278,8 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                     );
                   }
 
+                  await refreshNotifications({ silent: true }).catch(() => undefined);
+
                   pushToast({
                     title: "Comment posted",
                     description: "The issue discussion has been updated.",
@@ -363,6 +367,7 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                             : currentDetail,
                         );
                         await reloadIssue().catch(() => undefined);
+                        await refreshNotifications({ silent: true }).catch(() => undefined);
 
                         pushToast({
                           title: "Assignment updated",
@@ -439,6 +444,7 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                             : currentDetail,
                         );
                         await reloadIssue().catch(() => undefined);
+                        await refreshNotifications({ silent: true }).catch(() => undefined);
 
                         pushToast({
                           title: "Status updated",
