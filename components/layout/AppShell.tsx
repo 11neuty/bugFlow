@@ -9,15 +9,19 @@ import {
   LayoutPanelTop,
   LogOut,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
+import { ProjectDeleteModal } from "@/components/dashboard/ProjectDeleteModal";
 import { ProjectModal } from "@/components/dashboard/ProjectModal";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useProjects } from "@/components/providers/ProjectProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { DEFAULT_PROJECT_NAME } from "@/lib/projects";
+import type { ProjectSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface AppShellProps {
@@ -48,14 +52,19 @@ export function AppShell({
   const {
     closeCreateProjectModal,
     createProject,
+    deleteProject,
     isLoading: isLoadingProjects,
     isCreateModalOpen,
     isReady: areProjectsReady,
     openCreateProjectModal,
     projects,
     selectProject,
+    selectedProject,
     selectedProjectId,
   } = useProjects();
+  const [projectPendingDelete, setProjectPendingDelete] =
+    useState<ProjectSummary | null>(null);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
 
   useEffect(() => {
     if (isReady && !user) {
@@ -200,6 +209,17 @@ export function AppShell({
                   New project
                 </Button>
 
+                {selectedProject &&
+                selectedProject.name !== DEFAULT_PROJECT_NAME ? (
+                  <Button
+                    leadingIcon={<Trash2 className="size-4" />}
+                    onClick={() => setProjectPendingDelete(selectedProject)}
+                    variant="danger"
+                  >
+                    Delete project
+                  </Button>
+                ) : null}
+
                 {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
               </div>
             </div>
@@ -234,6 +254,50 @@ export function AppShell({
           }
         }}
         open={isCreateModalOpen}
+      />
+
+      <ProjectDeleteModal
+        isSubmitting={isDeletingProject}
+        onClose={() => {
+          if (!isDeletingProject) {
+            setProjectPendingDelete(null);
+          }
+        }}
+        onSubmit={async () => {
+          if (!projectPendingDelete) {
+            return;
+          }
+
+          setIsDeletingProject(true);
+
+          try {
+            const result = await deleteProject(projectPendingDelete.id);
+
+            pushToast({
+              title: "Project deleted",
+              description:
+                result.movedIssueCount > 0
+                  ? `${result.movedIssueCount} issue${result.movedIssueCount === 1 ? "" : "s"} moved to ${result.fallbackProject.name}.`
+                  : `${projectPendingDelete.name} was archived safely.`,
+              tone: "success",
+            });
+            setProjectPendingDelete(null);
+          } catch (error) {
+            pushToast({
+              title: "Project deletion failed",
+              description:
+                error instanceof Error
+                  ? error.message
+                  : "Unable to delete the project right now.",
+              tone: "error",
+            });
+            throw error;
+          } finally {
+            setIsDeletingProject(false);
+          }
+        }}
+        open={Boolean(projectPendingDelete)}
+        project={projectPendingDelete}
       />
     </div>
   );

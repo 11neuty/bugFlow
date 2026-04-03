@@ -10,10 +10,10 @@ import {
   fetchIssueDetail,
   updateIssueRequest,
 } from "@/api/issues";
+import { ActivityTimeline } from "@/components/issues/ActivityTimeline";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useProjects } from "@/components/providers/ProjectProvider";
 import { useToast } from "@/components/providers/ToastProvider";
-import { AuditLogList } from "@/components/issues/AuditLogList";
 import { CommentComposer } from "@/components/issues/CommentComposer";
 import { AppShell } from "@/components/layout/AppShell";
 import { Badge } from "@/components/ui/Badge";
@@ -502,12 +502,12 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
 
             <div className="space-y-3">
               <div>
-                <h2 className="text-xl font-semibold text-slate-950">Audit log</h2>
+                <h2 className="text-xl font-semibold text-slate-950">Activity</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Every important workflow change is captured here.
+                  Every meaningful update to this issue is captured here.
                 </p>
               </div>
-              <AuditLogList logs={detail.auditLogs} />
+              <ActivityTimeline currentUserId={user?.id} logs={detail.auditLogs} />
             </div>
           </div>
         </div>

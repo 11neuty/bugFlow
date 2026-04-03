@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { ACTIVITY_LOG_LIMIT } from "@/lib/constants";
 import { badRequest, conflict, notFound } from "@/lib/errors";
 import { formatIssueKey } from "@/lib/issues";
 import {
@@ -214,10 +215,8 @@ export async function createIssue(
       userId: user.id,
       action: "ISSUE_CREATED",
       metadata: {
-        title: `${formatIssueKey(createdIssue.issueNumber)} ${createdIssue.title}`,
-        status: createdIssue.status,
-        assignee: assignee?.name ?? "Unassigned",
-        project: project.name,
+        issueKey: formatIssueKey(createdIssue.issueNumber),
+        title: createdIssue.title,
       },
     });
 
@@ -248,6 +247,7 @@ export async function getIssueDetail(id: string): Promise<IssueDetailPayload> {
         orderBy: {
           createdAt: "desc",
         },
+        take: ACTIVITY_LOG_LIMIT,
       },
     },
   });
@@ -367,10 +367,22 @@ export async function updateIssue(
       await createAuditLog(tx, {
         issueId: id,
         userId: user.id,
-        action: "ASSIGNMENT_CHANGED",
+        action: "ASSIGNED",
         metadata: {
           from: existingIssue.assignee?.name ?? null,
           to: nextIssue.assignee?.name ?? null,
+        },
+      });
+    }
+
+    if (input.priority && input.priority !== existingIssue.priority) {
+      await createAuditLog(tx, {
+        issueId: id,
+        userId: user.id,
+        action: "PRIORITY_CHANGED",
+        metadata: {
+          from: existingIssue.priority,
+          to: input.priority,
         },
       });
     }

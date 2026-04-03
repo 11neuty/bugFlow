@@ -38,17 +38,22 @@ enum IssueSeverity {
 enum AuditAction {
   ISSUE_CREATED
   STATUS_CHANGED
+  ASSIGNED
   ASSIGNMENT_CHANGED
+  PRIORITY_CHANGED
+  COMMENT_ADDED
   ISSUE_DELETED
 }
 
 model Project {
   id        String   @id @default(uuid())
   name      String   @unique
+  deletedAt DateTime?
   createdAt DateTime @default(now())
   issues    Issue[]
 
   @@index([createdAt])
+  @@index([deletedAt])
 }
 
 model User {

@@ -5,7 +5,10 @@ export type IssueSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type AuditAction =
   | "ISSUE_CREATED"
   | "STATUS_CHANGED"
+  | "ASSIGNED"
   | "ASSIGNMENT_CHANGED"
+  | "PRIORITY_CHANGED"
+  | "COMMENT_ADDED"
   | "ISSUE_DELETED";
 
 export interface ApiResponse<T> {
@@ -29,6 +32,12 @@ export interface ProjectSummary {
   id: string;
   name: string;
   createdAt: string;
+}
+
+export interface ProjectDeletePayload {
+  deleted: boolean;
+  fallbackProject: ProjectSummary;
+  movedIssueCount: number;
 }
 
 export interface IssueSummary {

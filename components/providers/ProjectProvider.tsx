@@ -10,9 +10,13 @@ import {
   type ReactNode,
 } from "react";
 
-import { createProjectRequest, fetchProjects } from "@/api/projects";
+import {
+  createProjectRequest,
+  deleteProjectRequest,
+  fetchProjects,
+} from "@/api/projects";
 import { useAuth } from "@/components/providers/AuthProvider";
-import type { ProjectSummary } from "@/lib/types";
+import type { ProjectDeletePayload, ProjectSummary } from "@/lib/types";
 
 const PROJECT_STORAGE_KEY = "bugflow.project-id";
 
@@ -26,6 +30,7 @@ interface ProjectContextValue {
   refreshProjects: (preferredProjectId?: string | null) => Promise<ProjectSummary[]>;
   selectProject: (projectId: string) => void;
   createProject: (name: string) => Promise<ProjectSummary>;
+  deleteProject: (projectId: string) => Promise<ProjectDeletePayload>;
   openCreateProjectModal: () => void;
   closeCreateProjectModal: () => void;
 }
@@ -180,6 +185,16 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const selectedProject =
     projects.find((project) => project.id === selectedProjectId) ?? null;
 
+  const deleteProject = useCallback(
+    async (projectId: string) => {
+      const result = await deleteProjectRequest(authorizedFetch, projectId);
+      await refreshProjects(result.fallbackProject.id);
+      setIsReady(true);
+      return result;
+    },
+    [authorizedFetch, refreshProjects],
+  );
+
   return (
     <ProjectContext.Provider
       value={{
@@ -192,6 +207,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         refreshProjects,
         selectProject: commitSelectedProjectId,
         createProject,
+        deleteProject,
         openCreateProjectModal: () => setIsCreateModalOpen(true),
         closeCreateProjectModal: () => setIsCreateModalOpen(false),
       }}

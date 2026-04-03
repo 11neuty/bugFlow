@@ -1,6 +1,7 @@
 import { notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import type { AuthUser } from "@/lib/types";
+import { createAuditLog } from "@/services/audit-log-service";
 import { commentWithUserInclude, serializeComment } from "@/services/serializers";
 
 async function ensureIssueExists(issueId: string) {
@@ -42,15 +43,44 @@ export async function createComment(
   issueId: string,
   input: { content: string },
 ) {
-  await ensureIssueExists(issueId);
+  const comment = await prisma.$transaction(async (tx) => {
+    const issue = await tx.issue.findFirst({
+      where: {
+        id: issueId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
 
-  const comment = await prisma.comment.create({
-    data: {
+    if (!issue) {
+      throw notFound("Issue not found.");
+    }
+
+    const createdComment = await tx.comment.create({
+      data: {
+        issueId,
+        userId: user.id,
+        content: input.content,
+      },
+      include: commentWithUserInclude,
+    });
+
+    await createAuditLog(tx, {
       issueId,
       userId: user.id,
-      content: input.content,
-    },
-    include: commentWithUserInclude,
+      action: "COMMENT_ADDED",
+      metadata: {
+        commentId: createdComment.id,
+        preview:
+          input.content.length > 140
+            ? `${input.content.slice(0, 137)}...`
+            : input.content,
+      },
+    });
+
+    return createdComment;
   });
 
   return {

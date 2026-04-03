@@ -1,4 +1,5 @@
 import type {
+  AuditLogRecord,
   CommentListPayload,
   IssueDetailPayload,
   IssueFilters,
@@ -92,6 +93,13 @@ export function fetchIssueDetail(
   issueId: string,
 ) {
   return authorizedFetch<IssueDetailPayload>(`/api/v1/issues/${issueId}`);
+}
+
+export function fetchIssueActivity(
+  authorizedFetch: AuthorizedFetcher,
+  issueId: string,
+) {
+  return authorizedFetch<AuditLogRecord[]>(`/api/v1/issues/${issueId}/activity`);
 }
 
 export function updateIssueRequest(

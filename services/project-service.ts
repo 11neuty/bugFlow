@@ -1,8 +1,11 @@
-import { conflict, notFound } from "@/lib/errors";
+import type { Prisma, PrismaClient } from "@prisma/client";
+
+import { badRequest, conflict, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_PROJECT_NAME } from "@/lib/projects";
 import { projectSummarySelect, serializeProject } from "@/services/serializers";
 
-export const DEFAULT_PROJECT_NAME = "Default Project";
+type ProjectClient = Prisma.TransactionClient | PrismaClient;
 
 const projectOrderBy = [
   {
@@ -42,6 +45,9 @@ export async function getProjects() {
   await getOrCreateDefaultProject();
 
   const projects = await prisma.project.findMany({
+    where: {
+      deletedAt: null,
+    },
     orderBy: projectOrderBy,
     select: projectSummarySelect,
   });
@@ -50,9 +56,10 @@ export async function getProjects() {
 }
 
 export async function getProjectById(id: string) {
-  const project = await prisma.project.findUnique({
+  const project = await prisma.project.findFirst({
     where: {
       id,
+      deletedAt: null,
     },
     select: projectSummarySelect,
   });
@@ -64,17 +71,96 @@ export async function getProjectById(id: string) {
   return serializeProject(project);
 }
 
-export async function getOrCreateDefaultProject() {
-  const project = await prisma.project.upsert({
+export async function getOrCreateDefaultProject(client: ProjectClient = prisma) {
+  const existingProject = await client.project.findUnique({
     where: {
       name: DEFAULT_PROJECT_NAME,
     },
-    update: {},
-    create: {
+    select: {
+      ...projectSummarySelect,
+      deletedAt: true,
+    },
+  });
+
+  if (existingProject) {
+    if (existingProject.deletedAt) {
+      const restoredProject = await client.project.update({
+        where: {
+          id: existingProject.id,
+        },
+        data: {
+          deletedAt: null,
+        },
+        select: projectSummarySelect,
+      });
+
+      return serializeProject(restoredProject);
+    }
+
+    return serializeProject(existingProject);
+  }
+
+  const createdProject = await client.project.create({
+    data: {
       name: DEFAULT_PROJECT_NAME,
     },
     select: projectSummarySelect,
   });
 
-  return serializeProject(project);
+  return serializeProject(createdProject);
+}
+
+export async function deleteProject(id: string) {
+  const project = await prisma.project.findFirst({
+    where: {
+      id,
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  if (!project) {
+    throw notFound("Project not found.");
+  }
+
+  if (project.name === DEFAULT_PROJECT_NAME) {
+    throw badRequest("Default Project cannot be deleted.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const fallbackProject = await getOrCreateDefaultProject(tx);
+
+    if (fallbackProject.id === project.id) {
+      throw badRequest("Default Project cannot be deleted.");
+    }
+
+    const movedIssues = await tx.issue.updateMany({
+      where: {
+        projectId: project.id,
+      },
+      data: {
+        projectId: fallbackProject.id,
+      },
+    });
+
+    await tx.project.update({
+      where: {
+        id: project.id,
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
+    console.log("Moved issues:", movedIssues.count);
+
+    return {
+      deleted: true,
+      fallbackProject,
+      movedIssueCount: movedIssues.count,
+    };
+  });
 }
