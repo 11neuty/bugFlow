@@ -21,17 +21,13 @@ export async function GET(request: NextRequest) {
         Object.fromEntries(request.nextUrl.searchParams.entries()),
       );
 
-      console.log("Issues API: authenticated request", {
+      console.log("Issues API: executing query", {
         userId: user.id,
         role: user.role,
         query,
       });
 
-      console.log("Issues API: verifying database connection");
       await prisma.$queryRaw(Prisma.sql`SELECT 1`);
-      console.log("Issues API: database connection OK");
-
-      console.log("Issues API: executing listIssues query");
       const result = await listIssues(query);
       console.log("Issues API: response data", {
         issueCount: result.issues.length,

@@ -11,9 +11,7 @@ export async function GET() {
     });
 
     try {
-      console.log("Health check: verifying database connection");
       await prisma.$queryRaw(Prisma.sql`SELECT 1`);
-      console.log("Health check: database connection successful");
 
       return apiSuccess(
         {
