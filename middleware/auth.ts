@@ -14,7 +14,16 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
     throw unauthorized();
   }
 
-  const payload = await verifyAccessToken(token);
+  let payload;
+
+  try {
+    payload = await verifyAccessToken(token);
+  } catch (error) {
+    console.warn("Auth token verification failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw unauthorized("Invalid or expired token.");
+  }
 
   return {
     id: payload.id,

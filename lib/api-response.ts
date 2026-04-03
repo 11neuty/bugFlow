@@ -38,6 +38,14 @@ export function apiError(message: string, init?: Init) {
 }
 
 export function handleRouteError(error: unknown) {
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    console.error("Prisma initialization error", {
+      message: error.message,
+      stack: error.stack,
+    });
+    return apiError("Database unavailable", 503);
+  }
+
   if (error instanceof AppError) {
     return apiError(error.message, error.statusCode);
   }
@@ -50,9 +58,27 @@ export function handleRouteError(error: unknown) {
   }
 
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    console.error("Prisma known request error", {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+
     if (error.code === "P2002") {
       return apiError("A record with those values already exists.", 400);
     }
+
+    if (error.code === "P2022") {
+      return apiError("Database schema is out of sync.", 500);
+    }
+  }
+
+  if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+    console.error("Prisma unknown request error", {
+      message: error.message,
+      stack: error.stack,
+    });
+    return apiError("Database query failed", 500);
   }
 
   console.error(error);
