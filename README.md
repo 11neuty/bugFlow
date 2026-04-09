@@ -1,149 +1,71 @@
-# BugFlow
+# 🐞 BugFlow
 
-BugFlow is a production-ready bug tracking SaaS starter built with Next.js App Router, TypeScript, Tailwind CSS, Prisma, PostgreSQL, and JWT authentication with refresh-token rotation.
+## 📚 Overview
+BugFlow is a robust project management tool designed to streamline bug tracking and feature requests for developers and teams.
 
-## Features
+## 🚀 Features
+- **Real-time Collaboration:** Work together with your team.
+- **Customizable Workflows:** Adapt the platform to your team's needs.
+- **API Integration:** Seamless integration with your existing tools.
+- **Notifications:** Stay updated with changes and communications.
 
-- JWT auth with register, login, refresh, and logout flows
-- Secure refresh-token storage in an HttpOnly cookie plus the database
-- Role-aware issue management with optimistic locking
-- Kanban dashboard with filtering, pagination, and drag-and-drop status changes
-- Issue comments and audit logs
-- Consistent API envelopes with shared validation and error handling
-- Basic rate limiting and security headers through the root proxy
+## 💻 Technology Stack
+- **Frontend:** React, Redux, Tailwind CSS
+- **Backend:** Node.js, Express
+- **Database:** MongoDB
+- **Deployment:** Docker, AWS
 
-## Tech Stack
+## 🗺️ Database Schema
+### Users
+| Field       | Type        | Description                    |
+|-------------|-------------|--------------------------------|
+| id          | ObjectId   | Unique identifier for users    |
+| username    | String      | User's username                |
+| email       | String      | User's email address           |
 
-- Next.js 16 App Router
-- TypeScript
-- Tailwind CSS 4
-- Prisma ORM
-- PostgreSQL
-- `bcrypt`
-- `jose`
+### Bugs
+| Field       | Type        | Description                    |
+|-------------|-------------|--------------------------------|
+| id          | ObjectId   | Unique identifier for bugs     |
+| title       | String      | Title of the bug               |
+| status      | String      | Current status (open/closed)   |
 
-## Project Structure
+## 📡 API Endpoints
+- `GET /api/bugs` - Fetch all bugs
+- `POST /api/bugs` - Create a new bug
+- `GET /api/bugs/:id` - Fetch a specific bug
 
-```text
-app/
-  api/v1/
-  dashboard/
-  issues/[id]/
-  login/
-api/
-components/
-lib/
-middleware/
-prisma/
-services/
-proxy.ts
+## 🏗️ Project Structure
+```
+.
+├── client/          # Frontend files
+├── server/          # Backend files
+└── deploy/          # Deployment scripts
 ```
 
-## Environment Variables
+## ⚙️ Setup Guide
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/11neuty/bugFlow.git
+   ```
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+3. **Start the application:**
+   ```bash
+   npm start
+   ```
 
-Create a `.env` file from `.env.example`:
-
+## 🚢 Deployment Instructions
+Deploy using Docker by running:
 ```bash
-cp .env.example .env
+docker-compose up
 ```
 
-Required variables:
+## 📛 Badges
+![License](https://img.shields.io/badge/license-MIT-blue.svg)  ![Version](https://img.shields.io/badge/version-1.0.0-green.svg)  
 
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/bugflow?schema=public"
-DIRECT_URL="postgresql://postgres:postgres@localhost:5432/bugflow?schema=public"
-JWT_SECRET="replace-with-a-long-random-access-secret"
-REFRESH_SECRET="replace-with-a-long-random-refresh-secret"
-```
+---
 
-## Local Setup
-
-1. Install dependencies:
-
-```bash
-npm install
-```
-
-2. Make sure PostgreSQL is running and both `DATABASE_URL` and `DIRECT_URL` point to it.
-
-3. Apply the Prisma migration:
-
-```bash
-npm run db:migrate
-```
-
-4. Seed the default users:
-
-```bash
-npm run db:seed
-```
-
-5. Start the app:
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-## Generated Migration
-
-An initial SQL migration is included at:
-
-```text
-prisma/migrations/202603311945_init/migration.sql
-```
-
-## Default Seed Accounts
-
-- Admin: `admin@bugtracker.dev` / `Admin123!`
-- QA: `qa@bugtracker.dev` / `Qa123456!`
-- Developer: `dev@bugtracker.dev` / `Dev123456!`
-
-## Verification
-
-The current codebase passes:
-
-```bash
-npm run lint
-npm run build
-```
-
-## Deploy To Vercel
-
-1. Push the repository to GitHub.
-
-2. In Vercel, import the repository and keep the detected framework as Next.js.
-
-3. In Project Settings -> Environment Variables, add:
-
-```env
-DATABASE_URL="your-neon-pooled-connection-string"
-DIRECT_URL="your-neon-direct-connection-string"
-JWT_SECRET="your-production-access-secret"
-REFRESH_SECRET="your-production-refresh-secret"
-```
-
-Use the Neon pooled connection for `DATABASE_URL` and the direct connection for `DIRECT_URL`. This lets the app use pooled connections at runtime while Prisma migrations run through a direct connection during the build.
-
-4. In Project Settings -> Build & Development Settings, set the Build Command to:
-
-```bash
-npm run vercel-build
-```
-
-5. Deploy the project.
-
-6. After the first production deploy succeeds, run the seed once against the production database so you can log in with the default accounts:
-
-```bash
-npm run db:seed
-```
-
-Do not add the seed command to the Vercel build step.
-
-## Notes
-
-- `DELETE /api/v1/issues/:id` performs a soft delete through `deletedAt`.
-- Access tokens are short-lived and retried through the refresh flow on the client.
-- To fully run the app locally, a real PostgreSQL instance is still required.
+Contributions are welcome!
