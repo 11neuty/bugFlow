@@ -3,6 +3,7 @@ import type {
   CommentListPayload,
   IssueDetailPayload,
   IssueFilters,
+  IssueRelationRecord,
   IssueListPayload,
   IssueSummary,
 } from "@/lib/types";
@@ -153,6 +154,56 @@ export function createCommentRequest(
         "content-type": "application/json",
       },
       body: JSON.stringify({ content }),
+    },
+  );
+}
+
+export function updateCommentRequest(
+  authorizedFetch: AuthorizedFetcher,
+  commentId: string,
+  content: string,
+) {
+  return authorizedFetch<{ comment: CommentListPayload["comments"][number] }>(
+    `/api/v1/comments/${commentId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ content }),
+    },
+  );
+}
+
+export function createIssueRelationRequest(
+  authorizedFetch: AuthorizedFetcher,
+  issueId: string,
+  input: {
+    targetIssueId: string;
+    type: Extract<IssueRelationRecord["type"], "BLOCKS" | "RELATES_TO" | "DUPLICATES">;
+  },
+) {
+  return authorizedFetch<{ relation: IssueRelationRecord }>(
+    `/api/v1/issues/${issueId}/relations`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function deleteIssueRelationRequest(
+  authorizedFetch: AuthorizedFetcher,
+  issueId: string,
+  relationId: string,
+) {
+  return authorizedFetch<{ deleted: boolean }>(
+    `/api/v1/issues/${issueId}/relations/${relationId}`,
+    {
+      method: "DELETE",
     },
   );
 }

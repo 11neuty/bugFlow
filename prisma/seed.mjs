@@ -7,18 +7,21 @@ const DEFAULT_PROJECT_NAME = "Default Project";
 const users = [
   {
     email: "admin@bugtracker.dev",
+    username: "admin_user",
     password: "Admin123!",
     name: "Admin User",
     role: Role.ADMIN,
   },
   {
     email: "qa@bugtracker.dev",
+    username: "qa_analyst",
     password: "Qa123456!",
     name: "QA Analyst",
     role: Role.QA,
   },
   {
     email: "dev@bugtracker.dev",
+    username: "developer",
     password: "Dev123456!",
     name: "Developer",
     role: Role.DEVELOPER,
@@ -43,11 +46,13 @@ async function main() {
       where: { email: user.email },
       update: {
         name: user.name,
+        username: user.username,
         role: user.role,
         password,
       },
       create: {
         email: user.email,
+        username: user.username,
         name: user.name,
         role: user.role,
         password,

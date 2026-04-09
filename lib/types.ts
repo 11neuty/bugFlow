@@ -14,7 +14,13 @@ export type AuditAction =
 export type NotificationType =
   | "ISSUE_ASSIGNED"
   | "ISSUE_COMMENTED"
-  | "ISSUE_STATUS_CHANGED";
+  | "ISSUE_STATUS_CHANGED"
+  | "MENTIONED_IN_COMMENT";
+export type IssueRelationType =
+  | "BLOCKS"
+  | "RELATES_TO"
+  | "DUPLICATES"
+  | "BLOCKED_BY";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -30,6 +36,7 @@ export interface AuthUser {
 }
 
 export interface UserSummary extends AuthUser {
+  username: string;
   createdAt: string;
 }
 
@@ -65,8 +72,16 @@ export interface IssueSummary {
 export interface CommentRecord {
   id: string;
   content: string;
+  editedAt: string | null;
   createdAt: string;
   user: UserSummary;
+}
+
+export interface IssueRelationRecord {
+  id: string;
+  type: IssueRelationType;
+  createdAt: string;
+  relatedIssue: IssueSummary;
 }
 
 export interface NotificationIssueReference {
@@ -112,6 +127,7 @@ export interface IssueDetailPayload {
   comments: CommentRecord[];
   auditLogs: AuditLogRecord[];
   teamMembers: ProjectMemberUserSummary[];
+  relations: IssueRelationRecord[];
 }
 
 export interface CommentListPayload {

@@ -4,6 +4,8 @@ import { formatIssueKey } from "@/lib/issues";
 import type {
   AuditLogRecord,
   CommentRecord,
+  IssueRelationRecord,
+  IssueRelationType,
   IssueSummary,
   NotificationIssueReference,
   NotificationRecord,
@@ -17,6 +19,7 @@ import type {
 export const userSummarySelect = {
   id: true,
   email: true,
+  username: true,
   name: true,
   role: true,
   createdAt: true,
@@ -71,6 +74,15 @@ export const projectMemberWithUserInclude = {
   },
 } satisfies Prisma.ProjectMemberInclude;
 
+export const issueRelationInclude = {
+  sourceIssue: {
+    include: issueSummaryInclude,
+  },
+  targetIssue: {
+    include: issueSummaryInclude,
+  },
+} satisfies Prisma.IssueRelationInclude;
+
 type SerializedUser = Prisma.UserGetPayload<{
   select: typeof userSummarySelect;
 }>;
@@ -97,6 +109,10 @@ type SerializedNotification = Prisma.NotificationGetPayload<{
 
 type SerializedProjectMember = Prisma.ProjectMemberGetPayload<{
   include: typeof projectMemberWithUserInclude;
+}>;
+
+type SerializedIssueRelation = Prisma.IssueRelationGetPayload<{
+  include: typeof issueRelationInclude;
 }>;
 
 function normalizeAuditMetadata(
@@ -126,6 +142,7 @@ export function serializeUser(user: SerializedUser): UserSummary {
   return {
     id: user.id,
     email: user.email,
+    username: user.username,
     name: user.name,
     role: user.role,
     createdAt: user.createdAt.toISOString(),
@@ -166,8 +183,40 @@ export function serializeComment(comment: SerializedComment): CommentRecord {
   return {
     id: comment.id,
     content: comment.content,
+    editedAt: comment.editedAt?.toISOString() ?? null,
     createdAt: comment.createdAt.toISOString(),
     user: serializeUser(comment.user),
+  };
+}
+
+function getRelatedIssue(
+  relation: SerializedIssueRelation,
+  issueId: string,
+): { type: IssueRelationType; issue: SerializedIssue } {
+  if (relation.sourceIssueId === issueId) {
+    return {
+      type: relation.type as Exclude<IssueRelationType, "BLOCKED_BY">,
+      issue: relation.targetIssue,
+    };
+  }
+
+  return {
+    type: relation.type === "BLOCKS" ? "BLOCKED_BY" : (relation.type as IssueRelationType),
+    issue: relation.sourceIssue,
+  };
+}
+
+export function serializeIssueRelation(
+  relation: SerializedIssueRelation,
+  issueId: string,
+): IssueRelationRecord {
+  const related = getRelatedIssue(relation, issueId);
+
+  return {
+    id: relation.id,
+    type: related.type,
+    createdAt: relation.createdAt.toISOString(),
+    relatedIssue: serializeIssue(related.issue),
   };
 }
 

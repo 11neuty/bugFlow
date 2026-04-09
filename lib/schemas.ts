@@ -32,6 +32,7 @@ const optionalUuid = z.preprocess(
 
 const requiredUuid = z.string().trim().uuid("Invalid project ID.");
 const projectRoleSchema = z.enum(["ADMIN", "QA", "DEVELOPER", "VIEWER"]);
+const issueRelationTypeSchema = z.enum(["BLOCKS", "RELATES_TO", "DUPLICATES"]);
 
 export const registerSchema = z.object({
   name: z.string().trim().min(2, "Name is required.").max(MAX_NAME_LENGTH),
@@ -132,6 +133,26 @@ export const createCommentSchema = z.object({
     .trim()
     .min(1, "Comment cannot be empty.")
     .max(MAX_COMMENT_LENGTH),
+});
+
+export const updateCommentSchema = createCommentSchema;
+
+export const createIssueRelationSchema = z.object({
+  targetIssueId: z.string().trim().min(1, "Select a valid issue."),
+  type: issueRelationTypeSchema,
+});
+
+export const issueRelationRouteParamsSchema = z.object({
+  id: z.string().trim().min(1, "Invalid issue ID."),
+  relationId: z.string().trim().min(1, "Invalid relation ID."),
+});
+
+export const issueCommentRouteParamsSchema = z.object({
+  id: z.string().trim().min(1, "Invalid issue ID."),
+});
+
+export const commentRouteParamsSchema = z.object({
+  id: z.string().trim().min(1, "Invalid comment ID."),
 });
 
 export const issueQuerySchema = z.object({

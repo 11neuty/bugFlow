@@ -23,6 +23,10 @@ export function canReceiveNotification(projectRole: ProjectRole) {
   return projectRole !== "VIEWER";
 }
 
+export function canManageIssueRelations(projectRole: ProjectRole) {
+  return projectRole !== "VIEWER";
+}
+
 export function canEditIssue(
   userId: string,
   projectRole: ProjectRole,
@@ -64,6 +68,12 @@ export function assertCanCreateIssue(projectRole: ProjectRole) {
 export function assertCanCommentOnIssue(projectRole: ProjectRole) {
   if (!canCommentOnIssue(projectRole)) {
     throw forbidden("You do not have permission to comment in this project.");
+  }
+}
+
+export function assertCanManageIssueRelations(projectRole: ProjectRole) {
+  if (!canManageIssueRelations(projectRole)) {
+    throw forbidden("You do not have permission to manage issue dependencies.");
   }
 }
 
