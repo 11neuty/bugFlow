@@ -8,10 +8,18 @@ interface IssueAccessRecord {
 }
 
 export function canCreateIssue(projectRole: ProjectRole) {
-  return projectRole !== "VIEWER";
+  return (
+    projectRole === "ADMIN" ||
+    projectRole === "DEVELOPER" ||
+    projectRole === "QA"
+  );
 }
 
 export function canCommentOnIssue(projectRole: ProjectRole) {
+  return projectRole !== "VIEWER";
+}
+
+export function canReceiveNotification(projectRole: ProjectRole) {
   return projectRole !== "VIEWER";
 }
 

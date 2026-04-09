@@ -106,13 +106,14 @@ export function IssueFilterBar({
         Refresh
       </Button>
 
-      <Button
-        disabled={!canCreateIssue}
-        leadingIcon={<Plus className="size-4" />}
-        onClick={onCreateIssue}
-      >
-        New issue
-      </Button>
+      {canCreateIssue ? (
+        <Button
+          leadingIcon={<Plus className="size-4" />}
+          onClick={onCreateIssue}
+        >
+          New issue
+        </Button>
+      ) : null}
     </div>
   );
 }
