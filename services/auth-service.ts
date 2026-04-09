@@ -5,6 +5,7 @@ import { badRequest, unauthorized } from "@/lib/errors";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import type { AuthPayload, AuthUser, UserSummary } from "@/lib/types";
+import { findAvailableUsername } from "@/lib/usernames";
 import {
   ensureProjectMembership,
   mapGlobalRoleToProjectRole,
@@ -28,12 +29,14 @@ function toAuthUser(user: {
 function toUserSummary(user: {
   id: string;
   email: string;
+  username: string;
   name: string;
   role: AuthUser["role"];
   createdAt: Date;
 }) {
   return {
     ...toAuthUser(user),
+    username: user.username,
     createdAt: user.createdAt.toISOString(),
   } satisfies UserSummary;
 }
@@ -126,10 +129,16 @@ export async function createUserAccount(input: {
   const password = await bcrypt.hash(input.password, 10);
 
   const user = await prisma.$transaction(async (tx) => {
+    const username = await findAvailableUsername(tx, {
+      name: input.name,
+      email: input.email,
+    });
+
     const createdUser = await tx.user.create({
       data: {
         name: input.name,
         email: input.email,
+        username,
         password,
         role: input.role,
       },

@@ -6,14 +6,17 @@ export const DEFAULT_PAGE = 1;
 export const DEFAULT_PAGE_SIZE = 12;
 export const MAX_PAGE_SIZE = 50;
 export const MAX_NAME_LENGTH = 64;
+export const MAX_USERNAME_LENGTH = 32;
 export const MAX_PROJECT_NAME_LENGTH = 80;
 export const MAX_EMAIL_LENGTH = 254;
 export const MAX_PASSWORD_LENGTH = 72;
 export const MAX_ISSUE_TITLE_LENGTH = 120;
 export const MAX_ISSUE_DESCRIPTION_LENGTH = 4000;
 export const MAX_COMMENT_LENGTH = 1000;
+export const MAX_COMMENT_MENTIONS = 10;
 export const ACTIVITY_LOG_LIMIT = 50;
 export const NOTIFICATION_LIMIT = 20;
+export const ISSUE_RELATION_LIMIT = 20;
 
 export const ISSUE_SORT_FIELDS = ["createdAt", "updatedAt", "priority"] as const;
 

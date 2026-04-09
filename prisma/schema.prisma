@@ -56,6 +56,7 @@ enum NotificationType {
   ISSUE_ASSIGNED
   ISSUE_COMMENTED
   ISSUE_STATUS_CHANGED
+  MENTIONED_IN_COMMENT
 }
 
 model Project {
@@ -73,6 +74,7 @@ model Project {
 model User {
   id             String         @id @default(cuid())
   email          String         @unique
+  username       String         @unique
   password       String
   name           String
   role           Role           @default(DEVELOPER)
@@ -108,6 +110,8 @@ model Issue {
   comments    Comment[]
   auditLogs   AuditLog[]
   notifications Notification[]
+  sourceRelations IssueRelation[] @relation("SourceRelation")
+  targetRelations IssueRelation[] @relation("TargetRelation")
 
   @@index([projectId])
   @@index([projectId, status, createdAt])
@@ -144,6 +148,7 @@ model Comment {
   issueId   String
   userId    String
   content   String
+  editedAt  DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
@@ -152,6 +157,20 @@ model Comment {
   @@index([issueId])
   @@index([userId])
   @@index([createdAt])
+}
+
+model IssueRelation {
+  id            String   @id @default(uuid())
+  sourceIssueId String
+  targetIssueId String
+  type          String
+  createdAt     DateTime @default(now())
+  sourceIssue   Issue    @relation("SourceRelation", fields: [sourceIssueId], references: [id], onDelete: Cascade)
+  targetIssue   Issue    @relation("TargetRelation", fields: [targetIssueId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceIssueId, targetIssueId, type])
+  @@index([sourceIssueId])
+  @@index([targetIssueId])
 }
 
 model AuditLog {

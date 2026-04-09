@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { apiSuccess } from "@/lib/api-response";
-import { createCommentSchema } from "@/lib/schemas";
+import { createCommentSchema, issueCommentRouteParamsSchema } from "@/lib/schemas";
 import { withAuthRoute } from "@/middleware/auth";
 import { createComment, listComments } from "@/services/comments-service";
 
@@ -16,7 +16,7 @@ export async function GET(
   context: IssueCommentRouteContext,
 ) {
   return withAuthRoute(request, async (user) => {
-    const { id } = await context.params;
+    const { id } = issueCommentRouteParamsSchema.parse(await context.params);
     const result = await listComments(user, id);
 
     return apiSuccess(result, 200);
@@ -28,7 +28,7 @@ export async function POST(
   context: IssueCommentRouteContext,
 ) {
   return withAuthRoute(request, async (user) => {
-    const { id } = await context.params;
+    const { id } = issueCommentRouteParamsSchema.parse(await context.params);
     const body = await request.json();
     const input = createCommentSchema.parse(body);
     const result = await createComment(user, id, input);

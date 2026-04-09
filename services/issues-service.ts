@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
-import { ACTIVITY_LOG_LIMIT } from "@/lib/constants";
+import { ACTIVITY_LOG_LIMIT, ISSUE_RELATION_LIMIT } from "@/lib/constants";
 import { badRequest, conflict, notFound } from "@/lib/errors";
 import { formatIssueKey } from "@/lib/issues";
 import {
@@ -30,9 +30,11 @@ import {
   commentWithUserInclude,
   issueSummaryInclude,
   projectMemberWithUserInclude,
+  issueRelationInclude,
   serializeAuditLog,
   serializeComment,
   serializeIssue,
+  serializeIssueRelation,
   serializeProjectMemberUser,
 } from "@/services/serializers";
 
@@ -283,6 +285,30 @@ export async function getIssueDetail(
         },
         take: ACTIVITY_LOG_LIMIT,
       },
+      sourceRelations: {
+        where: {
+          targetIssue: {
+            deletedAt: null,
+          },
+        },
+        include: issueRelationInclude,
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: ISSUE_RELATION_LIMIT,
+      },
+      targetRelations: {
+        where: {
+          sourceIssue: {
+            deletedAt: null,
+          },
+        },
+        include: issueRelationInclude,
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: ISSUE_RELATION_LIMIT,
+      },
     },
   });
 
@@ -313,6 +339,10 @@ export async function getIssueDetail(
     comments: issue.comments.map(serializeComment),
     auditLogs: issue.auditLogs.map((log) => serializeAuditLog(log, userNameById)),
     teamMembers: teamMembers.map(serializeProjectMemberUser),
+    relations: [...issue.sourceRelations, ...issue.targetRelations]
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .slice(0, ISSUE_RELATION_LIMIT)
+      .map((relation) => serializeIssueRelation(relation, issue.id)),
   };
 }
 
@@ -481,6 +511,19 @@ export async function deleteIssue(user: AuthUser, id: string) {
   assertCanDeleteIssue(membership.role);
 
   await prisma.$transaction(async (tx) => {
+    await tx.issueRelation.deleteMany({
+      where: {
+        OR: [
+          {
+            sourceIssueId: id,
+          },
+          {
+            targetIssueId: id,
+          },
+        ],
+      },
+    });
+
     await tx.issue.update({
       where: {
         id,

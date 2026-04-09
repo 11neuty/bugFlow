@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   CheckCheck,
+  MessageCircleReply,
   MessageSquareMore,
   UserRoundPlus,
   Workflow,
@@ -28,6 +29,8 @@ function iconForNotification(type: NotificationRecord["type"]): LucideIcon {
       return UserRoundPlus;
     case "ISSUE_COMMENTED":
       return MessageSquareMore;
+    case "MENTIONED_IN_COMMENT":
+      return MessageCircleReply;
     case "ISSUE_STATUS_CHANGED":
       return Workflow;
     default:
