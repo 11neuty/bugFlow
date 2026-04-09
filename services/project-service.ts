@@ -1,24 +1,50 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-import { badRequest, conflict, notFound } from "@/lib/errors";
+import { badRequest, conflict } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_PROJECT_NAME } from "@/lib/projects";
 import { projectSummarySelect, serializeProject } from "@/services/serializers";
+import type { AuthUser } from "@/lib/types";
+import {
+  ensureProjectMembership,
+  ensureProjectMemberships,
+  mapGlobalRoleToProjectRole,
+  requireProjectAdmin,
+  requireProjectMembership,
+} from "@/services/project-members-service";
 
 type ProjectClient = Prisma.TransactionClient | PrismaClient;
 
-const projectOrderBy = [
-  {
-    createdAt: "asc" as const,
-  },
-  {
-    name: "asc" as const,
-  },
-];
+export async function ensureUserHasProjectMembership(
+  user: AuthUser,
+  client: ProjectClient = prisma,
+) {
+  const membershipCount = await client.projectMember.count({
+    where: {
+      userId: user.id,
+      project: {
+        deletedAt: null,
+      },
+    },
+  });
 
-export async function createProject(name: string) {
+  if (membershipCount > 0) {
+    return;
+  }
+
+  const defaultProject = await getOrCreateDefaultProject(client);
+  await ensureProjectMembership(
+    client,
+    defaultProject.id,
+    user.id,
+    mapGlobalRoleToProjectRole(user.role),
+  );
+}
+
+export async function createProjectForUser(user: AuthUser, name: string) {
   const existingProject = await prisma.project.findFirst({
     where: {
+      deletedAt: null,
       name: {
         equals: name,
         mode: "insensitive",
@@ -31,44 +57,67 @@ export async function createProject(name: string) {
     throw conflict("Project name already exists.");
   }
 
-  const project = await prisma.project.create({
-    data: {
-      name,
-    },
-    select: projectSummarySelect,
+  const project = await prisma.$transaction(async (tx) => {
+    const createdProject = await tx.project.create({
+      data: {
+        name,
+      },
+      select: projectSummarySelect,
+    });
+
+    await ensureProjectMembership(tx, createdProject.id, user.id, "ADMIN");
+
+    return createdProject;
   });
 
-  return serializeProject(project);
+  return serializeProject(project, {
+    currentUserRole: "ADMIN",
+  });
 }
 
-export async function getProjects() {
+export async function getProjects(user: AuthUser) {
   await getOrCreateDefaultProject();
+  await ensureUserHasProjectMembership(user);
 
-  const projects = await prisma.project.findMany({
+  const memberships = await prisma.projectMember.findMany({
     where: {
-      deletedAt: null,
+      userId: user.id,
+      project: {
+        deletedAt: null,
+      },
     },
-    orderBy: projectOrderBy,
-    select: projectSummarySelect,
+    orderBy: [
+      {
+        project: {
+          createdAt: "asc",
+        },
+      },
+      {
+        project: {
+          name: "asc",
+        },
+      },
+    ],
+    select: {
+      role: true,
+      project: {
+        select: projectSummarySelect,
+      },
+    },
   });
 
-  return projects.map(serializeProject);
+  return memberships.map((membership) =>
+    serializeProject(membership.project, {
+      currentUserRole: membership.role,
+    }),
+  );
 }
 
-export async function getProjectById(id: string) {
-  const project = await prisma.project.findFirst({
-    where: {
-      id,
-      deletedAt: null,
-    },
-    select: projectSummarySelect,
+export async function getProjectById(user: AuthUser, id: string) {
+  const membership = await requireProjectMembership(prisma, user.id, id);
+  return serializeProject(membership.project, {
+    currentUserRole: membership.role,
   });
-
-  if (!project) {
-    throw notFound("Project not found.");
-  }
-
-  return serializeProject(project);
 }
 
 export async function getOrCreateDefaultProject(client: ProjectClient = prisma) {
@@ -110,21 +159,9 @@ export async function getOrCreateDefaultProject(client: ProjectClient = prisma) 
   return serializeProject(createdProject);
 }
 
-export async function deleteProject(id: string) {
-  const project = await prisma.project.findFirst({
-    where: {
-      id,
-      deletedAt: null,
-    },
-    select: {
-      id: true,
-      name: true,
-    },
-  });
-
-  if (!project) {
-    throw notFound("Project not found.");
-  }
+export async function deleteProject(user: AuthUser, id: string) {
+  const membership = await requireProjectAdmin(prisma, user.id, id);
+  const project = membership.project;
 
   if (project.name === DEFAULT_PROJECT_NAME) {
     throw badRequest("Default Project cannot be deleted.");
@@ -132,10 +169,21 @@ export async function deleteProject(id: string) {
 
   return prisma.$transaction(async (tx) => {
     const fallbackProject = await getOrCreateDefaultProject(tx);
+    const projectMembers = await tx.projectMember.findMany({
+      where: {
+        projectId: project.id,
+      },
+      select: {
+        userId: true,
+        role: true,
+      },
+    });
 
     if (fallbackProject.id === project.id) {
       throw badRequest("Default Project cannot be deleted.");
     }
+
+    await ensureProjectMemberships(tx, fallbackProject.id, projectMembers);
 
     const movedIssues = await tx.issue.updateMany({
       where: {

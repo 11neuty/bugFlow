@@ -10,10 +10,18 @@ import {
   LogOut,
   ShieldCheck,
   Trash2,
+  Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import {
+  addProjectMemberRequest,
+  fetchProjectMembers,
+  removeProjectMemberRequest,
+  updateProjectMemberRoleRequest,
+} from "@/api/project-members";
 import { ProjectDeleteModal } from "@/components/dashboard/ProjectDeleteModal";
+import { ProjectMembersModal } from "@/components/dashboard/ProjectMembersModal";
 import { NotificationMenu } from "@/components/layout/NotificationMenu";
 import { ProjectModal } from "@/components/dashboard/ProjectModal";
 import { useAuth } from "@/components/providers/AuthProvider";
@@ -22,7 +30,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { DEFAULT_PROJECT_NAME } from "@/lib/projects";
-import type { ProjectSummary } from "@/lib/types";
+import type { ProjectMembersPayload, ProjectRole, ProjectSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface AppShellProps {
@@ -48,7 +56,7 @@ export function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isReady, logout } = useAuth();
+  const { user, isReady, logout, authorizedFetch } = useAuth();
   const { pushToast } = useToast();
   const {
     closeCreateProjectModal,
@@ -59,13 +67,52 @@ export function AppShell({
     isReady: areProjectsReady,
     openCreateProjectModal,
     projects,
+    refreshProjects,
     selectProject,
     selectedProject,
     selectedProjectId,
   } = useProjects();
   const [projectPendingDelete, setProjectPendingDelete] =
     useState<ProjectSummary | null>(null);
+  const [isProjectMembersOpen, setIsProjectMembersOpen] = useState(false);
+  const [projectMembersPayload, setProjectMembersPayload] =
+    useState<ProjectMembersPayload | null>(null);
+  const [isProjectMembersLoading, setIsProjectMembersLoading] = useState(false);
+  const [isProjectMembersSubmitting, setIsProjectMembersSubmitting] = useState(false);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
+
+  const loadProjectMembers = useCallback(
+    async (projectId: string) => {
+      setIsProjectMembersLoading(true);
+
+      try {
+        const result = await fetchProjectMembers(authorizedFetch, projectId);
+        setProjectMembersPayload(result);
+        return result;
+      } finally {
+        setIsProjectMembersLoading(false);
+      }
+    },
+    [authorizedFetch],
+  );
+
+  useEffect(() => {
+    if (!isProjectMembersOpen || !selectedProjectId) {
+      return;
+    }
+
+    void loadProjectMembers(selectedProjectId).catch((error) => {
+      pushToast({
+        title: "Unable to load project access",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Try again in a moment.",
+        tone: "error",
+      });
+      setIsProjectMembersOpen(false);
+    });
+  }, [isProjectMembersOpen, loadProjectMembers, pushToast, selectedProjectId]);
 
   useEffect(() => {
     if (isReady && !user) {
@@ -210,11 +257,22 @@ export function AppShell({
                   New project
                 </Button>
 
+                {selectedProject ? (
+                  <Button
+                    leadingIcon={<Users className="size-4" />}
+                    onClick={() => setIsProjectMembersOpen(true)}
+                    variant="secondary"
+                  >
+                    Team access
+                  </Button>
+                ) : null}
+
                 <NotificationMenu />
 
                 {selectedProject &&
                 selectedProject.name !== DEFAULT_PROJECT_NAME ? (
                   <Button
+                    disabled={selectedProject.currentUserRole !== "ADMIN"}
                     leadingIcon={<Trash2 className="size-4" />}
                     onClick={() => setProjectPendingDelete(selectedProject)}
                     variant="danger"
@@ -301,6 +359,120 @@ export function AppShell({
         }}
         open={Boolean(projectPendingDelete)}
         project={projectPendingDelete}
+      />
+
+      <ProjectMembersModal
+        key={`${selectedProjectId ?? "no-project"}:${isProjectMembersOpen ? "open" : "closed"}`}
+        availableUsers={projectMembersPayload?.availableUsers ?? []}
+        currentUserRole={
+          (projectMembersPayload?.currentUserRole ??
+            selectedProject?.currentUserRole ??
+            null) as ProjectRole | null
+        }
+        isLoading={isProjectMembersLoading}
+        isSubmitting={isProjectMembersSubmitting}
+        members={projectMembersPayload?.members ?? []}
+        onAddMember={async (input) => {
+          if (!selectedProjectId) {
+            return;
+          }
+
+          setIsProjectMembersSubmitting(true);
+
+          try {
+            await addProjectMemberRequest(authorizedFetch, selectedProjectId, input);
+            await loadProjectMembers(selectedProjectId);
+            await refreshProjects(selectedProjectId);
+            pushToast({
+              title: "Member added",
+              description: "Project access has been updated.",
+              tone: "success",
+            });
+          } catch (error) {
+            pushToast({
+              title: "Unable to add member",
+              description:
+                error instanceof Error
+                  ? error.message
+                  : "Try again in a moment.",
+              tone: "error",
+            });
+            throw error;
+          } finally {
+            setIsProjectMembersSubmitting(false);
+          }
+        }}
+        onClose={() => {
+          if (!isProjectMembersSubmitting) {
+            setIsProjectMembersOpen(false);
+          }
+        }}
+        onRemoveMember={async (memberId) => {
+          if (!selectedProjectId) {
+            return;
+          }
+
+          setIsProjectMembersSubmitting(true);
+
+          try {
+            await removeProjectMemberRequest(authorizedFetch, selectedProjectId, memberId);
+            const refreshed = await loadProjectMembers(selectedProjectId).catch(() => null);
+            await refreshProjects(
+              refreshed?.project.id ?? selectedProjectId,
+            );
+            pushToast({
+              title: "Member removed",
+              description: "Project access has been updated.",
+              tone: "success",
+            });
+          } catch (error) {
+            pushToast({
+              title: "Unable to remove member",
+              description:
+                error instanceof Error
+                  ? error.message
+                  : "Try again in a moment.",
+              tone: "error",
+            });
+            throw error;
+          } finally {
+            setIsProjectMembersSubmitting(false);
+          }
+        }}
+        onUpdateMemberRole={async (memberId, role) => {
+          if (!selectedProjectId) {
+            return;
+          }
+
+          setIsProjectMembersSubmitting(true);
+
+          try {
+            await updateProjectMemberRoleRequest(authorizedFetch, selectedProjectId, memberId, {
+              role,
+            });
+            await loadProjectMembers(selectedProjectId);
+            await refreshProjects(selectedProjectId);
+            pushToast({
+              title: "Role updated",
+              description: "Project permissions are now current.",
+              tone: "success",
+            });
+          } catch (error) {
+            pushToast({
+              title: "Unable to update role",
+              description:
+                error instanceof Error
+                  ? error.message
+                  : "Try again in a moment.",
+              tone: "error",
+            });
+            throw error;
+          } finally {
+            setIsProjectMembersSubmitting(false);
+          }
+        }}
+        open={isProjectMembersOpen}
+        project={selectedProject}
       />
     </div>
   );

@@ -1,4 +1,5 @@
 export type Role = "ADMIN" | "QA" | "DEVELOPER";
+export type ProjectRole = "ADMIN" | "QA" | "DEVELOPER" | "VIEWER";
 export type IssueStatus = "TODO" | "IN_PROGRESS" | "DONE" | "CLOSED" | "REJECTED";
 export type IssuePriority = "LOW" | "MEDIUM" | "HIGH";
 export type IssueSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -36,6 +37,7 @@ export interface ProjectSummary {
   id: string;
   name: string;
   createdAt: string;
+  currentUserRole?: ProjectRole;
 }
 
 export interface ProjectDeletePayload {
@@ -109,7 +111,7 @@ export interface IssueDetailPayload {
   issue: IssueSummary;
   comments: CommentRecord[];
   auditLogs: AuditLogRecord[];
-  teamMembers: UserSummary[];
+  teamMembers: ProjectMemberUserSummary[];
 }
 
 export interface CommentListPayload {
@@ -118,6 +120,48 @@ export interface CommentListPayload {
 
 export interface NotificationUnreadCountPayload {
   unreadCount: number;
+}
+
+export interface ProjectMemberUserSummary extends UserSummary {
+  projectRole: ProjectRole;
+}
+
+export interface ProjectMemberRecord {
+  id: string;
+  role: ProjectRole;
+  createdAt: string;
+  updatedAt: string;
+  user: UserSummary;
+}
+
+export interface ProjectMembersPayload {
+  project: ProjectSummary;
+  currentUserRole: ProjectRole;
+  members: ProjectMemberRecord[];
+  availableUsers: UserSummary[];
+}
+
+export interface StatusMetric {
+  status: IssueStatus;
+  count: number;
+}
+
+export interface TrendPoint {
+  date: string;
+  created: number;
+  resolved: number;
+}
+
+export interface MetricsOverviewPayload {
+  project: ProjectSummary;
+  totalIssues: number;
+  activeIssues: number;
+  completedIssues: number;
+  averageResolutionHours: number | null;
+  averageResolutionDays: number | null;
+  resolutionSampleSize: number;
+  statusBreakdown: StatusMetric[];
+  trend: TrendPoint[];
 }
 
 export interface IssueFilters {

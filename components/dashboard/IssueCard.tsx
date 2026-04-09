@@ -34,15 +34,20 @@ function severityTone(severity: IssueSummary["severity"]) {
 interface IssueCardProps {
   issue: IssueSummary;
   onOpen: (issueId: string) => void;
+  draggable?: boolean;
 }
 
-export function IssueCard({ issue, onOpen }: IssueCardProps) {
+export function IssueCard({ issue, onOpen, draggable = true }: IssueCardProps) {
   return (
     <Card
       className="cursor-pointer rounded-[24px] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_20px_55px_-35px_rgba(15,23,42,0.55)]"
-      draggable
+      draggable={draggable}
       onClick={() => onOpen(issue.id)}
       onDragStart={(event) => {
+        if (!draggable) {
+          event.preventDefault();
+          return;
+        }
         event.dataTransfer.setData("text/plain", issue.id);
       }}
       role="button"

@@ -11,16 +11,16 @@ import {
 } from "@/lib/constants";
 import type {
   IssueSummary,
+  ProjectMemberUserSummary,
+  ProjectRole,
   ProjectSummary,
-  Role,
-  UserSummary,
 } from "@/lib/types";
 
 interface IssueModalProps {
   open: boolean;
-  members: UserSummary[];
+  members: ProjectMemberUserSummary[];
   project: ProjectSummary | null;
-  currentUserRole: Role;
+  currentUserRole: ProjectRole;
   onClose: () => void;
   onSubmit: (input: {
     title: string;
@@ -51,7 +51,7 @@ export function IssueModal({
   const [formState, setFormState] = useState(initialState);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const assignableMembers = members.filter(
-    (member) => currentUserRole === "DEVELOPER" || member.role !== "ADMIN",
+    (member) => currentUserRole === "DEVELOPER" || member.projectRole !== "ADMIN",
   );
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export function IssueModal({
               <option value="">Unassigned</option>
               {assignableMembers.map((member) => (
                 <option key={member.id} value={member.id}>
-                  {member.name} ({member.role})
+                  {member.name} ({member.projectRole})
                 </option>
               ))}
             </select>

@@ -67,7 +67,7 @@ function badgeToneForPriority(priority: IssueSummary["priority"]) {
 export function IssueDetailView({ issueId }: { issueId: string }) {
   const { authorizedFetch, isReady, user } = useAuth();
   const { refreshNotifications } = useNotifications();
-  const { selectProject, selectedProjectId } = useProjects();
+  const { selectProject, selectedProject, selectedProjectId } = useProjects();
   const { pushToast } = useToast();
   const [detail, setDetail] = useState<IssueDetailPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -136,12 +136,17 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
           : leftTimestamp - rightTimestamp;
       })
     : [];
-  const restrictAdminAssignments = user?.role === "ADMIN" || user?.role === "QA";
+  const currentProjectRole =
+    detail && selectedProject?.id === detail.issue.project.id
+      ? selectedProject.currentUserRole
+      : undefined;
+  const restrictAdminAssignments =
+    currentProjectRole === "ADMIN" || currentProjectRole === "QA";
   const assignableTeamMembers = detail
     ? detail.teamMembers.filter(
         (member) =>
           !restrictAdminAssignments ||
-          member.role !== "ADMIN" ||
+          member.projectRole !== "ADMIN" ||
           member.id === detail.issue.assignee?.id,
       )
     : [];
@@ -257,36 +262,45 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                 </label>
               </div>
 
-              <CommentComposer
-                onSubmit={async (content) => {
-                  const result = await createCommentRequest(
-                    authorizedFetch,
-                    issueId,
-                    content,
-                  );
-
-                  try {
-                    await reloadIssue();
-                  } catch {
-                    setDetail((currentDetail) =>
-                      currentDetail
-                        ? {
-                            ...currentDetail,
-                            comments: [...currentDetail.comments, result.comment],
-                          }
-                        : currentDetail,
+              {currentProjectRole === "VIEWER" ? (
+                <Card className="rounded-[24px] border border-dashed border-slate-200 p-5">
+                  <p className="text-sm text-slate-500">
+                    Viewers can read the discussion, but only project contributors can
+                    add comments.
+                  </p>
+                </Card>
+              ) : (
+                <CommentComposer
+                  onSubmit={async (content) => {
+                    const result = await createCommentRequest(
+                      authorizedFetch,
+                      issueId,
+                      content,
                     );
-                  }
 
-                  await refreshNotifications({ silent: true }).catch(() => undefined);
+                    try {
+                      await reloadIssue();
+                    } catch {
+                      setDetail((currentDetail) =>
+                        currentDetail
+                          ? {
+                              ...currentDetail,
+                              comments: [...currentDetail.comments, result.comment],
+                            }
+                          : currentDetail,
+                      );
+                    }
 
-                  pushToast({
-                    title: "Comment posted",
-                    description: "The issue discussion has been updated.",
-                    tone: "success",
-                  });
-                }}
-              />
+                    await refreshNotifications({ silent: true }).catch(() => undefined);
+
+                    pushToast({
+                      title: "Comment posted",
+                      description: "The issue discussion has been updated.",
+                      tone: "success",
+                    });
+                  }}
+                />
+              )}
 
               <div className="mt-6 space-y-3">
                 {sortedComments.length > 0 ? (
@@ -330,6 +344,7 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                   </p>
                   <select
                     className="mt-3 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none focus:border-[color:var(--color-primary)]"
+                    disabled={currentProjectRole === "VIEWER"}
                     onChange={async (event) => {
                       const previousDetail = detail;
 
@@ -392,7 +407,7 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                     <option value="">Unassigned</option>
                     {assignableTeamMembers.map((member) => (
                       <option key={member.id} value={member.id}>
-                        {member.name} ({member.role})
+                        {member.name} ({member.projectRole})
                       </option>
                     ))}
                   </select>
@@ -409,6 +424,7 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                   </p>
                   <select
                     className="mt-3 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none focus:border-[color:var(--color-primary)]"
+                    disabled={currentProjectRole === "VIEWER"}
                     onChange={async (event) => {
                       const nextStatus = event.target.value as IssueSummary["status"];
                       const previousDetail = detail;
@@ -474,7 +490,7 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                   </select>
                 </div>
 
-                {user?.role === "ADMIN" ? (
+                {currentProjectRole === "ADMIN" ? (
                   <Button
                     className="w-full"
                     leadingIcon={<Trash2 className="size-4" />}

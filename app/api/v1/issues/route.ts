@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       });
 
       await prisma.$queryRaw(Prisma.sql`SELECT 1`);
-      const result = await listIssues(query);
+      const result = await listIssues(user, query);
       console.log("Issues API: response data", {
         issueCount: result.issues.length,
         total: result.total,

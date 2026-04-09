@@ -16,9 +16,9 @@ interface IssueRouteContext {
 }
 
 export async function GET(request: NextRequest, context: IssueRouteContext) {
-  return withAuthRoute(request, async () => {
+  return withAuthRoute(request, async (user) => {
     const { id } = await context.params;
-    const result = await getIssueDetail(id);
+    const result = await getIssueDetail(user, id);
 
     return apiSuccess(result, 200);
   });

@@ -5,6 +5,11 @@ import { badRequest, unauthorized } from "@/lib/errors";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import type { AuthPayload, AuthUser, UserSummary } from "@/lib/types";
+import {
+  ensureProjectMembership,
+  mapGlobalRoleToProjectRole,
+} from "@/services/project-members-service";
+import { getOrCreateDefaultProject } from "@/services/project-service";
 
 function toAuthUser(user: {
   id: string;
@@ -120,13 +125,25 @@ export async function createUserAccount(input: {
 
   const password = await bcrypt.hash(input.password, 10);
 
-  const user = await prisma.user.create({
-    data: {
-      name: input.name,
-      email: input.email,
-      password,
-      role: input.role,
-    },
+  const user = await prisma.$transaction(async (tx) => {
+    const createdUser = await tx.user.create({
+      data: {
+        name: input.name,
+        email: input.email,
+        password,
+        role: input.role,
+      },
+    });
+
+    const defaultProject = await getOrCreateDefaultProject(tx);
+    await ensureProjectMembership(
+      tx,
+      defaultProject.id,
+      createdUser.id,
+      mapGlobalRoleToProjectRole(createdUser.role),
+    );
+
+    return createdUser;
   });
 
   return toUserSummary(user);

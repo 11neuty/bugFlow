@@ -15,9 +15,9 @@ export async function GET(
   request: NextRequest,
   context: IssueActivityRouteContext,
 ) {
-  return withAuthRoute(request, async () => {
+  return withAuthRoute(request, async (user) => {
     const { id } = await context.params;
-    const result = await listIssueActivity(prisma, id);
+    const result = await listIssueActivity(prisma, user, id);
 
     return apiSuccess(result, 200);
   });

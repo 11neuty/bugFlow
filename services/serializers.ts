@@ -7,6 +7,9 @@ import type {
   IssueSummary,
   NotificationIssueReference,
   NotificationRecord,
+  ProjectMemberRecord,
+  ProjectMemberUserSummary,
+  ProjectRole,
   ProjectSummary,
   UserSummary,
 } from "@/lib/types";
@@ -62,6 +65,12 @@ export const notificationWithIssueInclude = {
   },
 } satisfies Prisma.NotificationInclude;
 
+export const projectMemberWithUserInclude = {
+  user: {
+    select: userSummarySelect,
+  },
+} satisfies Prisma.ProjectMemberInclude;
+
 type SerializedUser = Prisma.UserGetPayload<{
   select: typeof userSummarySelect;
 }>;
@@ -84,6 +93,10 @@ type SerializedAuditLog = Prisma.AuditLogGetPayload<{
 
 type SerializedNotification = Prisma.NotificationGetPayload<{
   include: typeof notificationWithIssueInclude;
+}>;
+
+type SerializedProjectMember = Prisma.ProjectMemberGetPayload<{
+  include: typeof projectMemberWithUserInclude;
 }>;
 
 function normalizeAuditMetadata(
@@ -119,11 +132,15 @@ export function serializeUser(user: SerializedUser): UserSummary {
   };
 }
 
-export function serializeProject(project: SerializedProject): ProjectSummary {
+export function serializeProject(
+  project: SerializedProject,
+  options: { currentUserRole?: ProjectRole } = {},
+): ProjectSummary {
   return {
     id: project.id,
     name: project.name,
     createdAt: project.createdAt.toISOString(),
+    currentUserRole: options.currentUserRole,
   };
 }
 
@@ -188,5 +205,26 @@ export function serializeNotification(
     isRead: notification.isRead,
     createdAt: notification.createdAt.toISOString(),
     issue: notification.issue ? serializeNotificationIssue(notification.issue) : null,
+  };
+}
+
+export function serializeProjectMemberUser(
+  member: SerializedProjectMember,
+): ProjectMemberUserSummary {
+  return {
+    ...serializeUser(member.user),
+    projectRole: member.role,
+  };
+}
+
+export function serializeProjectMember(
+  member: SerializedProjectMember,
+): ProjectMemberRecord {
+  return {
+    id: member.id,
+    role: member.role,
+    createdAt: member.createdAt.toISOString(),
+    updatedAt: member.updatedAt.toISOString(),
+    user: serializeUser(member.user),
   };
 }

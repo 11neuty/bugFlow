@@ -4,6 +4,7 @@ import { ACTIVITY_LOG_LIMIT } from "@/lib/constants";
 import { badRequest, conflict, notFound } from "@/lib/errors";
 import { formatIssueKey } from "@/lib/issues";
 import {
+  assertCanCreateIssue,
   assertCanAssignIssue,
   assertCanDeleteIssue,
   assertCanEditIssue,
@@ -19,18 +20,20 @@ import type {
 import { createAuditLog } from "@/services/audit-log-service";
 import { createNotification } from "@/services/notification-service";
 import {
+  ensureUserHasProjectMembership,
   getOrCreateDefaultProject,
   getProjectById,
 } from "@/services/project-service";
+import { requireProjectMembership } from "@/services/project-members-service";
 import {
   auditLogWithUserInclude,
   commentWithUserInclude,
   issueSummaryInclude,
+  projectMemberWithUserInclude,
   serializeAuditLog,
   serializeComment,
   serializeIssue,
-  serializeUser,
-  userSummarySelect,
+  serializeProjectMemberUser,
 } from "@/services/serializers";
 
 const INACTIVE_ISSUE_STATUSES: IssueSummary["status"][] = ["CLOSED", "REJECTED"];
@@ -106,19 +109,30 @@ function buildIssueWhere(
   };
 }
 
-async function resolveAssignee(user: AuthUser, assigneeId?: string | null) {
+async function resolveAssignee(
+  actorProjectRole: "ADMIN" | "QA" | "DEVELOPER" | "VIEWER",
+  projectId: string,
+  assigneeId?: string | null,
+) {
   if (!assigneeId) {
     return null;
   }
 
-  const assignee = await prisma.user.findUnique({
+  const assignee = await prisma.projectMember.findUnique({
     where: {
-      id: assigneeId,
+      projectId_userId: {
+        projectId,
+        userId: assigneeId,
+      },
     },
-    select: {
-      id: true,
-      name: true,
-      role: true,
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          role: true,
+        },
+      },
     },
   });
 
@@ -127,28 +141,32 @@ async function resolveAssignee(user: AuthUser, assigneeId?: string | null) {
   }
 
   if (
-    (user.role === "ADMIN" || user.role === "QA") &&
+    (actorProjectRole === "ADMIN" || actorProjectRole === "QA") &&
     assignee.role === "ADMIN"
   ) {
     throw badRequest("Admins and QA cannot assign issues to admin users.");
   }
 
-  return assignee;
+  return assignee.user;
 }
 
-async function resolveProject(projectId?: string | null) {
+async function resolveProject(user: AuthUser, projectId?: string | null) {
   if (!projectId) {
     console.warn("projectId missing, using default project");
-    return getOrCreateDefaultProject();
+    await ensureUserHasProjectMembership(user);
+    const defaultProject = await getOrCreateDefaultProject();
+    return getProjectById(user, defaultProject.id);
   }
 
-  return getProjectById(projectId);
+  return getProjectById(user, projectId);
 }
 
-export async function listIssues(filters: IssueFilters) {
-  if (filters.projectId) {
-    await getProjectById(filters.projectId);
+export async function listIssues(user: AuthUser, filters: IssueFilters) {
+  if (!filters.projectId) {
+    throw badRequest("Project is required.");
   }
+
+  await requireProjectMembership(prisma, user.id, filters.projectId);
 
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 12;
@@ -194,8 +212,10 @@ export async function createIssue(
     assigneeId?: string;
   },
 ) {
-  const project = await resolveProject(input.projectId);
-  const assignee = await resolveAssignee(user, input.assigneeId);
+  const project = await resolveProject(user, input.projectId);
+  const membership = await requireProjectMembership(prisma, user.id, project.id);
+  assertCanCreateIssue(membership.role);
+  const assignee = await resolveAssignee(membership.role, project.id, input.assigneeId);
 
   const issue = await prisma.$transaction(async (tx) => {
     const createdIssue = await tx.issue.create({
@@ -239,7 +259,10 @@ export async function createIssue(
   };
 }
 
-export async function getIssueDetail(id: string): Promise<IssueDetailPayload> {
+export async function getIssueDetail(
+  user: AuthUser,
+  id: string,
+): Promise<IssueDetailPayload> {
   const issue = await prisma.issue.findFirst({
     where: {
       id,
@@ -267,20 +290,29 @@ export async function getIssueDetail(id: string): Promise<IssueDetailPayload> {
     throw notFound("Issue not found.");
   }
 
-  const teamMembers = await prisma.user.findMany({
-    orderBy: {
-      name: "asc",
+  await requireProjectMembership(prisma, user.id, issue.projectId);
+
+  const teamMembers = await prisma.projectMember.findMany({
+    where: {
+      projectId: issue.projectId,
     },
-    select: userSummarySelect,
+    include: projectMemberWithUserInclude,
+    orderBy: {
+      user: {
+        name: "asc",
+      },
+    },
   });
 
-  const userNameById = new Map(teamMembers.map((member) => [member.id, member.name]));
+  const userNameById = new Map(
+    teamMembers.map((member) => [member.user.id, member.user.name]),
+  );
 
   return {
     issue: serializeIssue(issue),
     comments: issue.comments.map(serializeComment),
     auditLogs: issue.auditLogs.map((log) => serializeAuditLog(log, userNameById)),
-    teamMembers: teamMembers.map(serializeUser),
+    teamMembers: teamMembers.map(serializeProjectMemberUser),
   };
 }
 
@@ -309,22 +341,23 @@ export async function updateIssue(
     throw notFound("Issue not found.");
   }
 
-  assertCanEditIssue(user, existingIssue);
+  const membership = await requireProjectMembership(prisma, user.id, existingIssue.projectId);
+  assertCanEditIssue(user.id, membership.role, existingIssue);
 
   if (
     input.assigneeId !== undefined &&
     input.assigneeId !== existingIssue.assigneeId
   ) {
-    assertCanAssignIssue(user, existingIssue);
+    assertCanAssignIssue(user.id, membership.role, existingIssue);
   }
 
   const nextAssignee =
     input.assigneeId !== undefined && input.assigneeId !== existingIssue.assigneeId
-      ? await resolveAssignee(user, input.assigneeId)
+      ? await resolveAssignee(membership.role, existingIssue.projectId, input.assigneeId)
       : undefined;
 
   if (input.status) {
-    validateStatusTransition(user, existingIssue, input.status);
+    validateStatusTransition(user.id, membership.role, existingIssue, input.status);
   }
 
   const updatedIssue = await prisma.$transaction(async (tx) => {
@@ -444,7 +477,8 @@ export async function deleteIssue(user: AuthUser, id: string) {
     throw notFound("Issue not found.");
   }
 
-  assertCanDeleteIssue(user);
+  const membership = await requireProjectMembership(prisma, user.id, issue.projectId);
+  assertCanDeleteIssue(membership.role);
 
   await prisma.$transaction(async (tx) => {
     await tx.issue.update({

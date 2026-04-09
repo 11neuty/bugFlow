@@ -30,6 +30,9 @@ const optionalUuid = z.preprocess(
   z.string().uuid("Invalid project ID.").optional(),
 );
 
+const requiredUuid = z.string().trim().uuid("Invalid project ID.");
+const projectRoleSchema = z.enum(["ADMIN", "QA", "DEVELOPER", "VIEWER"]);
+
 export const registerSchema = z.object({
   name: z.string().trim().min(2, "Name is required.").max(MAX_NAME_LENGTH),
   email: z
@@ -81,6 +84,23 @@ export const createProjectSchema = z.object({
     .trim()
     .min(2, "Project name is required.")
     .max(MAX_PROJECT_NAME_LENGTH, "Project name is too long."),
+});
+
+export const projectMemberCreateSchema = z.object({
+  userId: z.string().trim().min(1, "Select a user to add."),
+  role: projectRoleSchema,
+});
+
+export const projectMemberUpdateSchema = z.object({
+  role: projectRoleSchema,
+});
+
+export const metricsQuerySchema = z.object({
+  projectId: requiredUuid,
+});
+
+export const projectIdParamSchema = z.object({
+  id: requiredUuid,
 });
 
 export const updateIssueSchema = z
