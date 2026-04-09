@@ -139,7 +139,7 @@ async function resolveAssignee(
   });
 
   if (!assignee) {
-    throw notFound("Assignee not found.");
+    throw badRequest("Assignee must be a member of this project.");
   }
 
   if (

@@ -18,16 +18,11 @@ export async function resolveMentionedProjectMembers(
     return [];
   }
 
-  return client.projectMember.findMany({
+  const projectMembers = await client.projectMember.findMany({
     where: {
       projectId: input.projectId,
       userId: {
         not: input.actorUserId,
-      },
-      user: {
-        username: {
-          in: usernames,
-        },
       },
     },
     include: {
@@ -39,4 +34,10 @@ export async function resolveMentionedProjectMembers(
       },
     },
   });
+
+  const allowedUsernames = new Set(usernames);
+
+  return projectMembers.filter((member) =>
+    allowedUsernames.has(member.user.username.toLowerCase()),
+  );
 }

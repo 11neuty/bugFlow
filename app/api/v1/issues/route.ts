@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 
-import { apiSuccess } from "@/lib/api-response";
+import { apiError, apiSuccess } from "@/lib/api-response";
 import { getDatabaseEnvDiagnostics } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { createIssueSchema, issueQuerySchema } from "@/lib/schemas";
@@ -51,6 +51,19 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return withAuthRoute(request, async (user) => {
     const body = await request.json();
+
+    if (!body?.title || !body?.projectId) {
+      return apiError("Invalid payload", 400);
+    }
+
+    if (
+      body.assigneeId !== undefined &&
+      body.assigneeId !== null &&
+      typeof body.assigneeId !== "string"
+    ) {
+      return apiError("Invalid payload", 400);
+    }
+
     const input = createIssueSchema.parse(body);
     const result = await createIssue(user, input);
 

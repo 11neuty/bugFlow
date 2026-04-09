@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { useToast } from "@/components/providers/ToastProvider";
 import { Modal } from "@/components/ui/Modal";
 import {
   MAX_ISSUE_DESCRIPTION_LENGTH,
@@ -40,6 +41,13 @@ const initialState = {
   assigneeId: "",
 };
 
+const initialErrors = {
+  title: "",
+  description: "",
+  project: "",
+  assigneeId: "",
+};
+
 export function IssueModal({
   open,
   members,
@@ -48,7 +56,9 @@ export function IssueModal({
   onClose,
   onSubmit,
 }: IssueModalProps) {
+  const { pushToast } = useToast();
   const [formState, setFormState] = useState(initialState);
+  const [errors, setErrors] = useState(initialErrors);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const assignableMembers = members.filter(
     (member) => currentUserRole === "DEVELOPER" || member.projectRole !== "ADMIN",
@@ -57,6 +67,7 @@ export function IssueModal({
   useEffect(() => {
     if (open) {
       setFormState(initialState);
+      setErrors(initialErrors);
       setIsSubmitting(false);
     }
   }, [open]);
@@ -76,22 +87,49 @@ export function IssueModal({
         className="space-y-5"
         onSubmit={async (event) => {
           event.preventDefault();
+          const nextErrors = {
+            title: formState.title.trim() ? "" : "Title is required.",
+            description: formState.description.trim()
+              ? ""
+              : "Description is required.",
+            project: project?.id ? "" : "Select a project first.",
+            assigneeId:
+              !formState.assigneeId ||
+              assignableMembers.some((member) => member.id === formState.assigneeId)
+                ? ""
+                : "Select a valid assignee from this project.",
+          };
+
+          setErrors(nextErrors);
+
+          if (Object.values(nextErrors).some(Boolean) || !project?.id) {
+            return;
+          }
+
           setIsSubmitting(true);
 
           try {
-            if (!project) {
-              return;
-            }
-
             await onSubmit({
-              title: formState.title,
-              description: formState.description,
+              title: formState.title.trim(),
+              description: formState.description.trim(),
               priority: formState.priority,
               severity: formState.severity,
               projectId: project.id,
-              assigneeId: formState.assigneeId || undefined,
+              assigneeId:
+                typeof formState.assigneeId === "string" && formState.assigneeId
+                  ? formState.assigneeId
+                  : undefined,
             });
             onClose();
+          } catch (submitError) {
+            pushToast({
+              title: "Unable to create issue",
+              description:
+                submitError instanceof Error
+                  ? submitError.message
+                  : "Check the issue details and try again.",
+              tone: "error",
+            });
           } finally {
             setIsSubmitting(false);
           }
@@ -104,17 +142,27 @@ export function IssueModal({
           <p className="mt-2 text-sm font-medium text-slate-950">
             {project?.name ?? "Select a project first"}
           </p>
+          {errors.project ? (
+            <p className="mt-2 text-sm text-red-600">{errors.project}</p>
+          ) : null}
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
           <Input
+            error={errors.title}
             label="Title"
             maxLength={MAX_ISSUE_TITLE_LENGTH}
             onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                title: event.target.value,
-              }))
+              {
+                setFormState((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }));
+                setErrors((current) => ({
+                  ...current,
+                  title: "",
+                }));
+              }
             }
             placeholder="Example: Login redirect loops after refresh"
             value={formState.title}
@@ -125,10 +173,16 @@ export function IssueModal({
             <select
               className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none focus:border-[color:var(--color-primary)]"
               onChange={(event) =>
-                setFormState((current) => ({
-                  ...current,
-                  assigneeId: event.target.value,
-                }))
+                {
+                  setFormState((current) => ({
+                    ...current,
+                    assigneeId: event.target.value,
+                  }));
+                  setErrors((current) => ({
+                    ...current,
+                    assigneeId: "",
+                  }));
+                }
               }
               value={formState.assigneeId}
             >
@@ -139,6 +193,9 @@ export function IssueModal({
                 </option>
               ))}
             </select>
+            {errors.assigneeId ? (
+              <span className="text-xs text-red-600">{errors.assigneeId}</span>
+            ) : null}
             {currentUserRole !== "DEVELOPER" ? (
               <span className="text-xs text-slate-500">
                 Admin users cannot be assigned by Admin or QA accounts.
@@ -153,14 +210,23 @@ export function IssueModal({
             className="min-h-36 rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-[color:var(--color-primary)] focus:ring-4 focus:ring-blue-100"
             maxLength={MAX_ISSUE_DESCRIPTION_LENGTH}
             onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                description: event.target.value,
-              }))
+              {
+                setFormState((current) => ({
+                  ...current,
+                  description: event.target.value,
+                }));
+                setErrors((current) => ({
+                  ...current,
+                  description: "",
+                }));
+              }
             }
             placeholder="What happened, where it happened, and what the expected behavior should be."
             value={formState.description}
           />
+          {errors.description ? (
+            <span className="text-sm text-red-600">{errors.description}</span>
+          ) : null}
         </label>
 
         <div className="grid gap-5 md:grid-cols-2">

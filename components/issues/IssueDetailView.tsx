@@ -96,7 +96,10 @@ function relationTone(type: IssueRelationRecord["type"]) {
   }
 }
 
-function renderCommentContent(content: string) {
+function renderCommentContentWithValidation(
+  content: string,
+  validMentions: ReadonlySet<string>,
+) {
   const matches = Array.from(content.matchAll(COMMENT_MENTION_REGEX));
 
   if (matches.length === 0) {
@@ -114,14 +117,18 @@ function renderCommentContent(content: string) {
       nodes.push(content.slice(cursor, start));
     }
 
-    nodes.push(
-      <span
-        className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700"
-        key={`${mentionText}-${index}`}
-      >
-        {mentionText}
-      </span>,
-    );
+    if (validMentions.has((match[1] ?? "").toLowerCase())) {
+      nodes.push(
+        <span
+          className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700"
+          key={`${mentionText}-${index}`}
+        >
+          {mentionText}
+        </span>,
+      );
+    } else {
+      nodes.push(mentionText);
+    }
 
     cursor = start + mentionText.length;
   });
@@ -281,6 +288,9 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
           ),
       )
     : [];
+  const validMentionUsernames = new Set(
+    detail?.teamMembers.map((member) => member.username.toLowerCase()) ?? [],
+  );
 
   return (
     <AppShell
@@ -624,6 +634,7 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                     });
                   }}
                   placeholder="Leave a clear handoff note, reproduction hint, or decision. Use @username to mention teammates."
+                  teamMembers={detail.teamMembers}
                 />
               )}
 
@@ -728,10 +739,14 @@ export function IssueDetailView({ issueId }: { issueId: string }) {
                               }
                             }}
                             submitLabel="Save changes"
+                            teamMembers={detail.teamMembers}
                           />
                         ) : (
                           <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                            {renderCommentContent(comment.content)}
+                            {renderCommentContentWithValidation(
+                              comment.content,
+                              validMentionUsernames,
+                            )}
                           </p>
                         )}
                       </Card>
