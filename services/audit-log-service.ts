@@ -2,11 +2,11 @@ import type { AuditAction, Prisma, PrismaClient } from "@prisma/client";
 
 import { ACTIVITY_LOG_LIMIT } from "@/lib/constants";
 import { notFound } from "@/lib/errors";
-import type { AuditLogRecord } from "@/lib/types";
+import type { AuditLogRecord, AuthUser } from "@/lib/types";
+import { requireProjectMembership } from "@/services/project-members-service";
 import {
   auditLogWithUserInclude,
   serializeAuditLog,
-  userSummarySelect,
 } from "@/services/serializers";
 
 type AuditLogClient = Prisma.TransactionClient | PrismaClient;
@@ -34,6 +34,7 @@ export function createAuditLog(
 
 export async function listIssueActivity(
   prisma: PrismaClient,
+  user: AuthUser,
   issueId: string,
 ): Promise<AuditLogRecord[]> {
   const issue = await prisma.issue.findFirst({
@@ -43,12 +44,15 @@ export async function listIssueActivity(
     },
     select: {
       id: true,
+      projectId: true,
     },
   });
 
   if (!issue) {
     throw notFound("Issue not found.");
   }
+
+  await requireProjectMembership(prisma, user.id, issue.projectId);
 
   const [logs, teamMembers] = await prisma.$transaction([
     prisma.auditLog.findMany({
@@ -61,14 +65,28 @@ export async function listIssueActivity(
       },
       take: ACTIVITY_LOG_LIMIT,
     }),
-    prisma.user.findMany({
-      orderBy: {
-        name: "asc",
+    prisma.projectMember.findMany({
+      where: {
+        projectId: issue.projectId,
       },
-      select: userSummarySelect,
+      orderBy: {
+        user: {
+          name: "asc",
+        },
+      },
+      select: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     }),
   ]);
 
-  const userNameById = new Map(teamMembers.map((member) => [member.id, member.name]));
+  const userNameById = new Map(
+    teamMembers.map((member) => [member.user.id, member.user.name]),
+  );
   return logs.map((log) => serializeAuditLog(log, userNameById));
 }

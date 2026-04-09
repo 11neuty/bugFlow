@@ -1,9 +1,11 @@
 import { notFound } from "@/lib/errors";
 import { formatIssueKey } from "@/lib/issues";
+import { assertCanCommentOnIssue } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AuthUser } from "@/lib/types";
 import { createAuditLog } from "@/services/audit-log-service";
 import { createNotification } from "@/services/notification-service";
+import { requireProjectMembership } from "@/services/project-members-service";
 import { commentWithUserInclude, serializeComment } from "@/services/serializers";
 
 async function ensureIssueExists(issueId: string) {
@@ -14,16 +16,20 @@ async function ensureIssueExists(issueId: string) {
     },
     select: {
       id: true,
+      projectId: true,
     },
   });
 
   if (!issue) {
     throw notFound("Issue not found.");
   }
+
+  return issue;
 }
 
-export async function listComments(issueId: string) {
-  await ensureIssueExists(issueId);
+export async function listComments(user: AuthUser, issueId: string) {
+  const issue = await ensureIssueExists(issueId);
+  await requireProjectMembership(prisma, user.id, issue.projectId);
 
   const comments = await prisma.comment.findMany({
     where: {
@@ -55,12 +61,16 @@ export async function createComment(
         id: true,
         issueNumber: true,
         assigneeId: true,
+        projectId: true,
       },
     });
 
     if (!issue) {
       throw notFound("Issue not found.");
     }
+
+    const membership = await requireProjectMembership(tx, user.id, issue.projectId);
+    assertCanCommentOnIssue(membership.role);
 
     const createdComment = await tx.comment.create({
       data: {

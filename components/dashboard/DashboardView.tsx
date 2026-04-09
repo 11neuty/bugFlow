@@ -9,19 +9,22 @@ import {
   fetchIssues,
   updateIssueRequest,
 } from "@/api/issues";
-import { createUserRequest, fetchUsers } from "@/api/users";
+import { fetchProjectMembers } from "@/api/project-members";
+import { createUserRequest } from "@/api/users";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useProjects } from "@/components/providers/ProjectProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { IssueFilterBar } from "@/components/dashboard/IssueFilterBar";
 import { IssueModal } from "@/components/dashboard/IssueModal";
 import { KanbanBoard } from "@/components/dashboard/KanbanBoard";
+import { ProjectMetricsPanel } from "@/components/dashboard/ProjectMetricsPanel";
 import { useNotifications } from "@/components/providers/NotificationProvider";
 import { UserModal } from "@/components/dashboard/UserModal";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import type { IssueFilters, IssueSummary, UserSummary } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import type { IssueFilters, IssueSummary, ProjectMemberUserSummary } from "@/lib/types";
 
 const initialFilters: IssueFilters = {
   page: 1,
@@ -31,6 +34,7 @@ const initialFilters: IssueFilters = {
 };
 
 export function DashboardView() {
+  const [activeView, setActiveView] = useState<"board" | "metrics">("board");
   const router = useRouter();
   const { authorizedFetch, isReady, user } = useAuth();
   const {
@@ -42,11 +46,14 @@ export function DashboardView() {
   } = useProjects();
   const { refreshNotifications } = useNotifications();
   const { pushToast } = useToast();
+  const currentProjectRole = selectedProject?.currentUserRole ?? null;
+  const canCreateIssues = currentProjectRole !== "VIEWER";
+  const canMoveIssues = currentProjectRole !== "VIEWER";
   const [filters, setFilters] = useState<IssueFilters>(initialFilters);
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [issues, setIssues] = useState<IssueSummary[]>([]);
-  const [members, setMembers] = useState<UserSummary[]>([]);
+  const [members, setMembers] = useState<ProjectMemberUserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -100,7 +107,7 @@ export function DashboardView() {
             ...filters,
             projectId: selectedProjectId,
           }),
-          fetchUsers(authorizedFetch),
+          fetchProjectMembers(authorizedFetch, selectedProjectId),
         ]);
 
         if (cancelled) {
@@ -108,7 +115,12 @@ export function DashboardView() {
         }
 
         setIssues(issueResult.issues);
-        setMembers(userResult.users);
+        setMembers(
+          userResult.members.map((member) => ({
+            ...member.user,
+            projectRole: member.role,
+          })),
+        );
         setMeta({
           total: issueResult.total,
           activeTotal: issueResult.activeTotal,
@@ -152,11 +164,16 @@ export function DashboardView() {
           ...filters,
           projectId: selectedProjectId,
         }),
-        fetchUsers(authorizedFetch),
+        fetchProjectMembers(authorizedFetch, selectedProjectId),
       ]);
 
       setIssues(issueResult.issues);
-      setMembers(userResult.users);
+      setMembers(
+        userResult.members.map((member) => ({
+          ...member.user,
+          projectRole: member.role,
+        })),
+      );
       setMeta({
         total: issueResult.total,
         activeTotal: issueResult.activeTotal,
@@ -201,8 +218,40 @@ export function DashboardView() {
     >
       {selectedProject ? (
         <div className="space-y-4">
+          <Card className="p-3">
+            <div className="inline-flex rounded-full border border-slate-200 bg-white p-1">
+              {[
+                { id: "board", label: "Board" },
+                { id: "metrics", label: "Metrics" },
+              ].map((view) => (
+                <button
+                  key={view.id}
+                  className={cn(
+                    "rounded-full px-4 py-2 text-sm font-medium transition",
+                    activeView === view.id
+                      ? "bg-slate-950 text-white"
+                      : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
+                  )}
+                  onClick={() => setActiveView(view.id as "board" | "metrics")}
+                  type="button"
+                >
+                  {view.label}
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          {activeView === "metrics" ? (
+            <ProjectMetricsPanel
+              authorizedFetch={authorizedFetch}
+              isActive={activeView === "metrics"}
+              projectId={selectedProjectId}
+            />
+          ) : (
+            <>
           <Card className="p-5">
             <IssueFilterBar
+              canCreateIssue={canCreateIssues}
               filters={filters}
               isRefreshing={isRefreshing}
               onCreateIssue={() => setIsCreateOpen(true)}
@@ -222,6 +271,7 @@ export function DashboardView() {
           </Card>
 
           <KanbanBoard
+            allowStatusChanges={canMoveIssues}
             error={error}
             issues={issues}
             loading={loading}
@@ -316,6 +366,8 @@ export function DashboardView() {
               </Button>
             </div>
           </Card>
+            </>
+          )}
         </div>
       ) : (
         <Card className="p-8 text-center">
@@ -333,7 +385,7 @@ export function DashboardView() {
 
       <IssueModal
         project={selectedProject}
-        currentUserRole={user?.role ?? "DEVELOPER"}
+        currentUserRole={selectedProject?.currentUserRole ?? "DEVELOPER"}
         members={members}
         onClose={() => setIsCreateOpen(false)}
         onSubmit={async (input) => {

@@ -43,6 +43,7 @@ interface KanbanBoardProps {
   issues: IssueSummary[];
   loading: boolean;
   error: string | null;
+  allowStatusChanges?: boolean;
   onOpenIssue: (issueId: string) => void;
   onMoveIssue: (issueId: string, status: IssueStatus) => void;
   onRetry: () => void;
@@ -52,6 +53,7 @@ export function KanbanBoard({
   issues,
   loading,
   error,
+  allowStatusChanges = true,
   onOpenIssue,
   onMoveIssue,
   onRetry,
@@ -114,7 +116,7 @@ export function KanbanBoard({
               event.preventDefault();
               const issueId = event.dataTransfer.getData("text/plain");
 
-              if (issueId) {
+              if (allowStatusChanges && issueId) {
                 onMoveIssue(issueId, column.status);
               }
             }}
@@ -136,6 +138,7 @@ export function KanbanBoard({
                 columnIssues.map((issue) => (
                   <IssueCard
                     key={issue.id}
+                    draggable={allowStatusChanges}
                     issue={issue}
                     onOpen={onOpenIssue}
                   />

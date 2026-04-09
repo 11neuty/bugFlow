@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   CheckCheck,
-  CircleDot,
   MessageSquareMore,
   UserRoundPlus,
   Workflow,
@@ -17,12 +16,11 @@ import { createPortal } from "react-dom";
 import { useNotifications } from "@/components/providers/NotificationProvider";
 import { useProjects } from "@/components/providers/ProjectProvider";
 import { useToast } from "@/components/providers/ToastProvider";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { getActivityDateLabel } from "@/lib/activity";
 import type { NotificationRecord } from "@/lib/types";
-import { cn, formatDate, formatRelative } from "@/lib/utils";
+import { formatRelative } from "@/lib/utils";
 
 function iconForNotification(type: NotificationRecord["type"]): LucideIcon {
   switch (type) {
@@ -33,26 +31,14 @@ function iconForNotification(type: NotificationRecord["type"]): LucideIcon {
     case "ISSUE_STATUS_CHANGED":
       return Workflow;
     default:
-      return CircleDot;
-  }
-}
-
-function toneForNotification(type: NotificationRecord["type"]) {
-  switch (type) {
-    case "ISSUE_ASSIGNED":
-      return "blue";
-    case "ISSUE_COMMENTED":
-      return "amber";
-    case "ISSUE_STATUS_CHANGED":
-      return "green";
-    default:
-      return "neutral";
-  }
+      return Bell;
+    }
 }
 
 export function NotificationMenu() {
   const router = useRouter();
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const { selectProject } = useProjects();
   const { pushToast } = useToast();
 
@@ -66,13 +52,35 @@ export function NotificationMenu() {
   } = useNotifications();
 
   const [open, setOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [open]);
 
   // click outside handler
   useEffect(() => {
     if (!open) return;
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (
+        panelRef.current?.contains(target) ||
+        anchorRef.current?.contains(target)
+      ) {
+        return;
+      }
+
+      if (open) {
         setOpen(false);
       }
     };
@@ -98,16 +106,21 @@ export function NotificationMenu() {
   }, [notifications]);
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative" ref={anchorRef}>
       {/* 🔔 BUTTON */}
       <button
         aria-label="Open notifications"
+        aria-expanded={open}
         className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
         onClick={() => {
-          setOpen((prev) => !prev);
-          if (!open) {
+          const nextOpen = !open;
+
+          if (nextOpen) {
+            setIsVisible(false);
             void refreshNotifications({ silent: true });
           }
+
+          setOpen(nextOpen);
         }}
         type="button"
       >
@@ -124,8 +137,12 @@ export function NotificationMenu() {
       {open &&
         createPortal(
           <div
-            ref={menuRef}
-            className="fixed top-20 right-6 z-[9999] w-[380px]"
+            ref={panelRef}
+            className={`fixed right-6 top-20 z-[100] w-[380px] origin-top-right transition duration-150 ease-out ${
+              isVisible
+                ? "translate-y-0 scale-100 opacity-100"
+                : "-translate-y-2 scale-95 opacity-0"
+            }`}
           >
             <Card className="overflow-hidden rounded-[28px] p-0 shadow-[0_30px_80px_-36px_rgba(15,23,42,0.42)] bg-white">
               
@@ -142,7 +159,20 @@ export function NotificationMenu() {
                   disabled={unreadCount === 0}
                   size="sm"
                   variant="ghost"
-                  onClick={markAllNotificationsRead}
+                  onClick={async () => {
+                    try {
+                      await markAllNotificationsRead();
+                    } catch (error) {
+                      pushToast({
+                        title: "Unable to mark notifications",
+                        description:
+                          error instanceof Error
+                            ? error.message
+                            : "Try again in a moment.",
+                        tone: "error",
+                      });
+                    }
+                  }}
                 >
                   <CheckCheck className="size-4 mr-1" />
                   Mark all
@@ -153,7 +183,7 @@ export function NotificationMenu() {
               <div className="max-h-[460px] overflow-y-auto px-4 py-4">
                 {notifications.length === 0 ? (
                   <p className="text-center text-sm text-slate-500">
-                    No notifications
+                    {isLoading ? "Loading notifications..." : "No notifications yet"}
                   </p>
                 ) : (
                   groupedNotifications.map((group) => (
@@ -170,30 +200,48 @@ export function NotificationMenu() {
                             key={n.id}
                             className="w-full text-left p-3 rounded-xl hover:bg-slate-50"
                             onClick={async () => {
-                              if (!n.isRead) {
-                                await markNotificationRead(n.id);
-                              }
+                              try {
+                                if (!n.isRead) {
+                                  await markNotificationRead(n.id);
+                                }
 
-                              if (n.issue?.project.id) {
-                                selectProject(n.issue.project.id);
-                              }
+                                if (n.issue?.project.id) {
+                                  selectProject(n.issue.project.id);
+                                }
 
-                              setOpen(false);
+                                setOpen(false);
 
-                              if (n.issue?.id) {
-                                router.push(`/issues/${n.issue.id}`);
+                                if (n.issue?.id) {
+                                  router.push(`/issues/${n.issue.id}`);
+                                }
+                              } catch (error) {
+                                pushToast({
+                                  title: "Unable to open notification",
+                                  description:
+                                    error instanceof Error
+                                      ? error.message
+                                      : "Try again in a moment.",
+                                  tone: "error",
+                                });
                               }
                             }}
+                            type="button"
                           >
                             <div className="flex gap-3">
                               <Icon className="size-4 mt-1" />
 
                               <div>
-                                <p className="text-sm font-medium">
+                                <p className="text-sm font-medium text-slate-900">
                                   {n.message}
                                 </p>
 
-                                <p className="text-xs text-slate-400">
+                                {n.issue ? (
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    {n.issue.issueKey} · {n.issue.project.name}
+                                  </p>
+                                ) : null}
+
+                                <p className="mt-1 text-xs text-slate-400">
                                   {formatRelative(n.createdAt)}
                                 </p>
                               </div>

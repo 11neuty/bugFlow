@@ -14,6 +14,13 @@ enum Role {
   DEVELOPER
 }
 
+enum ProjectRole {
+  ADMIN
+  QA
+  DEVELOPER
+  VIEWER
+}
+
 enum IssueStatus {
   TODO
   IN_PROGRESS
@@ -57,6 +64,7 @@ model Project {
   deletedAt DateTime?
   createdAt DateTime @default(now())
   issues    Issue[]
+  members   ProjectMember[]
 
   @@index([createdAt])
   @@index([deletedAt])
@@ -75,6 +83,7 @@ model User {
   comments       Comment[]
   auditLogs      AuditLog[]
   notifications  Notification[]
+  projectMembers ProjectMember[]
   refreshTokens  RefreshToken[]
 }
 
@@ -101,6 +110,8 @@ model Issue {
   notifications Notification[]
 
   @@index([projectId])
+  @@index([projectId, status, createdAt])
+  @@index([projectId, deletedAt, createdAt])
   @@index([status])
   @@index([priority])
   @@index([severity])
@@ -110,6 +121,22 @@ model Issue {
   @@index([createdAt])
   @@index([updatedAt])
   @@index([deletedAt])
+}
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  projectId String
+  userId    String
+  role      ProjectRole
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@index([projectId, role])
 }
 
 model Comment {

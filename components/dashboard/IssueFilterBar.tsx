@@ -10,6 +10,7 @@ interface IssueFilterBarProps {
   filters: IssueFilters;
   search: string;
   isRefreshing: boolean;
+  canCreateIssue: boolean;
   onSearchChange: (value: string) => void;
   onFiltersChange: (nextFilters: Partial<IssueFilters>) => void;
   onRefresh: () => void;
@@ -20,6 +21,7 @@ export function IssueFilterBar({
   filters,
   search,
   isRefreshing,
+  canCreateIssue,
   onSearchChange,
   onFiltersChange,
   onRefresh,
@@ -104,7 +106,11 @@ export function IssueFilterBar({
         Refresh
       </Button>
 
-      <Button leadingIcon={<Plus className="size-4" />} onClick={onCreateIssue}>
+      <Button
+        disabled={!canCreateIssue}
+        leadingIcon={<Plus className="size-4" />}
+        onClick={onCreateIssue}
+      >
         New issue
       </Button>
     </div>

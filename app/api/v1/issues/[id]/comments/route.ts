@@ -15,9 +15,9 @@ export async function GET(
   request: NextRequest,
   context: IssueCommentRouteContext,
 ) {
-  return withAuthRoute(request, async () => {
+  return withAuthRoute(request, async (user) => {
     const { id } = await context.params;
-    const result = await listComments(id);
+    const result = await listComments(user, id);
 
     return apiSuccess(result, 200);
   });

@@ -1,5 +1,5 @@
 import { forbidden } from "@/lib/errors";
-import type { AuthUser, IssueStatus } from "@/lib/types";
+import type { IssueStatus, ProjectRole } from "@/lib/types";
 
 interface IssueAccessRecord {
   reporterId: string;
@@ -7,42 +7,87 @@ interface IssueAccessRecord {
   status: IssueStatus;
 }
 
-export function canEditIssue(user: AuthUser, issue: IssueAccessRecord) {
-  if (user.role === "ADMIN" || user.role === "QA") {
+export function canCreateIssue(projectRole: ProjectRole) {
+  return projectRole !== "VIEWER";
+}
+
+export function canCommentOnIssue(projectRole: ProjectRole) {
+  return projectRole !== "VIEWER";
+}
+
+export function canEditIssue(
+  userId: string,
+  projectRole: ProjectRole,
+  issue: IssueAccessRecord,
+) {
+  if (projectRole === "ADMIN" || projectRole === "QA") {
     return true;
   }
 
-  return issue.reporterId === user.id || issue.assigneeId === user.id;
+  if (projectRole === "VIEWER") {
+    return false;
+  }
+
+  return issue.reporterId === userId || issue.assigneeId === userId;
 }
 
-export function canDeleteIssue(user: AuthUser) {
-  return user.role === "ADMIN";
+export function canDeleteIssue(projectRole: ProjectRole) {
+  return projectRole === "ADMIN";
 }
 
-export function canAssignIssue(user: AuthUser, issue: IssueAccessRecord) {
-  return user.role === "ADMIN" || user.role === "QA" || issue.reporterId === user.id;
+export function canAssignIssue(
+  userId: string,
+  projectRole: ProjectRole,
+  issue: IssueAccessRecord,
+) {
+  return (
+    projectRole === "ADMIN" ||
+    projectRole === "QA" ||
+    (projectRole === "DEVELOPER" && issue.reporterId === userId)
+  );
 }
 
-export function assertCanEditIssue(user: AuthUser, issue: IssueAccessRecord) {
-  if (!canEditIssue(user, issue)) {
+export function assertCanCreateIssue(projectRole: ProjectRole) {
+  if (!canCreateIssue(projectRole)) {
+    throw forbidden("You do not have permission to create issues in this project.");
+  }
+}
+
+export function assertCanCommentOnIssue(projectRole: ProjectRole) {
+  if (!canCommentOnIssue(projectRole)) {
+    throw forbidden("You do not have permission to comment in this project.");
+  }
+}
+
+export function assertCanEditIssue(
+  userId: string,
+  projectRole: ProjectRole,
+  issue: IssueAccessRecord,
+) {
+  if (!canEditIssue(userId, projectRole, issue)) {
     throw forbidden("You do not have permission to update this issue.");
   }
 }
 
-export function assertCanDeleteIssue(user: AuthUser) {
-  if (!canDeleteIssue(user)) {
+export function assertCanDeleteIssue(projectRole: ProjectRole) {
+  if (!canDeleteIssue(projectRole)) {
     throw forbidden("You do not have permission to delete this issue.");
   }
 }
 
-export function assertCanAssignIssue(user: AuthUser, issue: IssueAccessRecord) {
-  if (!canAssignIssue(user, issue)) {
+export function assertCanAssignIssue(
+  userId: string,
+  projectRole: ProjectRole,
+  issue: IssueAccessRecord,
+) {
+  if (!canAssignIssue(userId, projectRole, issue)) {
     throw forbidden("You do not have permission to reassign this issue.");
   }
 }
 
 export function validateStatusTransition(
-  user: AuthUser,
+  userId: string,
+  projectRole: ProjectRole,
   issue: IssueAccessRecord,
   nextStatus: IssueStatus,
 ) {
@@ -50,11 +95,15 @@ export function validateStatusTransition(
     return;
   }
 
-  if (user.role === "ADMIN" || user.role === "QA") {
+  if (projectRole === "ADMIN" || projectRole === "QA") {
     return;
   }
 
-  const isAssignee = issue.assigneeId === user.id;
+  if (projectRole === "VIEWER") {
+    throw forbidden("You do not have permission to change issue status.");
+  }
+
+  const isAssignee = issue.assigneeId === userId;
 
   if (!isAssignee) {
     throw forbidden("Only the assignee can move this issue through the workflow.");
