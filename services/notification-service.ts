@@ -6,6 +6,7 @@ import {
 
 import { NOTIFICATION_LIMIT } from "@/lib/constants";
 import { notFound } from "@/lib/errors";
+import { canReceiveNotification } from "@/lib/permissions";
 import type { NotificationRecord } from "@/lib/types";
 import { notificationWithIssueInclude, serializeNotification } from "@/services/serializers";
 
@@ -23,6 +24,37 @@ export async function createNotification(
   client: NotificationClient,
   input: CreateNotificationInput,
 ) {
+  if (input.issueId) {
+    const issue = await client.issue.findUnique({
+      where: {
+        id: input.issueId,
+      },
+      select: {
+        projectId: true,
+      },
+    });
+
+    if (!issue) {
+      return null;
+    }
+
+    const membership = await client.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId: issue.projectId,
+          userId: input.userId,
+        },
+      },
+      select: {
+        role: true,
+      },
+    });
+
+    if (!membership || !canReceiveNotification(membership.role)) {
+      return null;
+    }
+  }
+
   try {
     return await client.notification.create({
       data: {
